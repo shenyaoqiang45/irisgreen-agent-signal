@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+irisgreen_data/
+
+# Flutter / Dart
+.dart_tool/
+build/

@@ -1,0 +1,13 @@
+[project]
+name = "irisgreen-detection"
+version = "0.5.0"
+description = "IrisGreen perception algorithms: laser-spot detection, VLM grounding, 1bpp conversion"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "opencv-python>=4.9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["irisgreen_detection"]

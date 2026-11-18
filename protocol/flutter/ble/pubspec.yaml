@@ -1,0 +1,18 @@
+name: irisgreen_ble
+description: IrisGreen BLE Protocol SDK for Flutter, covering Android and iOS with the GATT profile, command protocol and image transfer.
+version: 0.2.0
+publish_to: none
+
+environment:
+  sdk: ^3.7.2
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_reactive_ble: ^5.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

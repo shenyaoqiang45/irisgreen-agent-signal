@@ -1,0 +1,83 @@
+{
+  "name": "IrisGreen GATT Profile",
+  "version": "0.1",
+  "source": "Iris Green Bluetooth Protocol V1.9 (2026-03-24) + on-device GATT enumeration",
+  "advertising": {
+    "name_prefix": "Iris-G",
+    "service_uuid": "adb401c0-b1c6-11ed-afa1-0242ac120002"
+  },
+  "mtu": {
+    "negotiated": 512,
+    "att_overhead": 3,
+    "max_chunk": 509
+  },
+  "services": {
+    "main": {
+      "uuid": "adb401c0-b1c6-11ed-afa1-0242ac120002",
+      "description": "Custom service for commands and image streaming",
+      "characteristics": {
+        "status_read": {
+          "uuid": "adb40001-b1c6-11ed-afa1-0242ac120001",
+          "properties": ["read"],
+          "description": "Readable status word; observed 01000000"
+        },
+        "notify": {
+          "uuid": "adb40002-b1c6-11ed-afa1-0242ac120002",
+          "properties": ["read", "notify"],
+          "description": "Unsolicited 8-byte device status frames; not command responses"
+        },
+        "command": {
+          "uuid": "adb40003-b1c6-11ed-afa1-0242ac120003",
+          "properties": ["write", "indicate"],
+          "description": "Command channel; write with response, reply arrives as an indication on the same characteristic"
+        },
+        "data": {
+          "uuid": "adb40004-b1c6-11ed-afa1-0242ac120004",
+          "properties": ["write_without_response"],
+          "description": "Bulk data stream, used for 1bpp image transfer"
+        },
+        "command2": {
+          "uuid": "adb40005-b1c6-11ed-afa1-0242ac120005",
+          "properties": ["write"],
+          "description": "Spare command channel"
+        }
+      }
+    },
+    "file_transfer": {
+      "uuid": "adb40006-b1c6-11ed-afa1-0242ac120001",
+      "description": "Secondary service for file transfer. Map by UUID suffix, not by the order in the protocol spreadsheet.",
+      "characteristics": {
+        "file_start": {
+          "uuid": "adb40006-b1c6-11ed-afa1-0242ac120003",
+          "properties": ["write"],
+          "description": "Transfer start packet"
+        },
+        "file_data": {
+          "uuid": "adb40006-b1c6-11ed-afa1-0242ac120002",
+          "properties": ["write_without_response"],
+          "description": "Transfer data stream"
+        },
+        "file_end": {
+          "uuid": "adb40006-b1c6-11ed-afa1-0242ac120004",
+          "properties": ["write"],
+          "description": "Transfer end packet"
+        }
+      }
+    },
+    "standard": {
+      "description": "Standard Bluetooth SIG characteristics",
+      "characteristics": {
+        "device_name": {"uuid": "00002a00-0000-1000-8000-00805f9b34fb", "properties": ["read"]},
+        "battery_level": {
+          "uuid": "00002a19-0000-1000-8000-00805f9b34fb",
+          "properties": ["read"],
+          "description": "Non-standard: returns 4 bytes little-endian, units unconfirmed"
+        },
+        "model_number": {"uuid": "00002a24-0000-1000-8000-00805f9b34fb", "properties": ["read"]},
+        "serial_number": {"uuid": "00002a25-0000-1000-8000-00805f9b34fb", "properties": ["read"]},
+        "firmware_revision": {"uuid": "00002a26-0000-1000-8000-00805f9b34fb", "properties": ["read"]},
+        "manufacturer_name": {"uuid": "00002a29-0000-1000-8000-00805f9b34fb", "properties": ["read"]}
+      }
+    }
+  }
+}

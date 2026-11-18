@@ -1,0 +1,41 @@
+{
+  "description": "Golden frames shared by every platform implementation (Python, Flutter, ...). Hex strings, no separators.",
+  "commands": [
+    {"name": "read brightness", "frame": "1100"},
+    {"name": "set brightness 100", "frame": "110164"},
+    {"name": "read picture count", "frame": "0500"},
+    {"name": "set keystone mode 2", "frame": "1C0102"},
+    {"name": "set keystone angle 10", "frame": "1D010A"},
+    {"name": "set keystone angle -10", "frame": "1D0150"},
+    {"name": "set keystone angle -70", "frame": "1D018C"},
+    {"name": "set fov 1", "frame": "1F0101"},
+    {"name": "mirror on", "frame": "1E0101"},
+    {"name": "flip upside down", "frame": "120101"},
+    {"name": "play group 0x0B (spec example)", "frame": "A00600640002000B"},
+    {"name": "play stop", "frame": "A10101"},
+    {"name": "delete group 5", "frame": "A20105"}
+  ],
+  "responses": [
+    {"name": "brightness 100", "raw": "80110164", "ok": true, "cmd": 17, "data": "64"},
+    {"name": "picture count 300", "raw": "8005022C01", "ok": true, "cmd": 5, "data": "2C01"},
+    {"name": "legacy 0x08 prefix", "raw": "08110164", "ok": true, "cmd": 17, "data": "64"},
+    {"name": "status frame", "raw": "0000012200000F00", "ok": false},
+    {"name": "too short", "raw": "8011", "ok": false}
+  ],
+  "file_packets": [
+    {
+      "name": "short name is padded to 16 bytes",
+      "size": 38462,
+      "file_name": "1_1.bmp",
+      "packet": "0000963E315F312E626D70000000000000000000"
+    }
+  ],
+  "image": {
+    "bmp_head": "424D3E960000000000003E0000002800000080020000E0010000010001000000000000960000120B0000120B0000000000000000000000000000FFFFFF00",
+    "pack": [
+      {"name": "top-left pixel lands in the last byte", "pixels": [[0, 0]], "byte_index": 38399, "value": "01"},
+      {"name": "second pixel of row 0", "pixels": [[0, 1]], "byte_index": 38399, "value": "02"},
+      {"name": "bottom-right pixel lands in the first byte", "pixels": [[479, 639]], "byte_index": 0, "value": "80"}
+    ]
+  }
+}
