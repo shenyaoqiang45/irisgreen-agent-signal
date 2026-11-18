@@ -92,6 +92,9 @@ Uint8List cmdSetKeystoneAngle(int angle) {
   return buildWrite(cmdKeystoneAngle, [angle >= 0 ? angle : 70 + angle.abs()]);
 }
 
+/// Inverse of the angle encoding: a value above 70 is a negative angle.
+int decodeKeystoneAngle(int value) => value <= 70 ? value : -(value - 70);
+
 Uint8List cmdSetFov(int level) {
   if (level < 0 || level > 2) throw ArgumentError('level must be 0..2');
   return buildWrite(cmdFov, [level]);

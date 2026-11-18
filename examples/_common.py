@@ -24,7 +24,7 @@ for _dir in _PACKAGE_DIRS:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from irisgreen_capability import CapabilityRegistry, OpenCvCamera, Runtime  # noqa: E402
+from irisgreen_capability import CapabilityRegistry, HikCamera, OpenCvCamera, Runtime  # noqa: E402
 from irisgreen_capability.sim import make_rig, make_sim_runtime  # noqa: E402
 
 
@@ -34,6 +34,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--address", default=None,
                         help="BLE address of the IrisGreen (default: the only one in range)")
     parser.add_argument("--camera", type=int, default=0, help="OpenCV camera index (hardware mode)")
+    parser.add_argument("--hik", nargs="?", const="", default=None, metavar="SERIAL",
+                        help="use a Hikrobot camera through the MVS SDK (optionally by serial number)")
+    parser.add_argument("--exposure-us", type=float, default=None,
+                        help="manual exposure for the Hik camera, in microseconds")
     parser.add_argument("--data-dir", default=str(ROOT / "irisgreen_data"))
     return parser
 
@@ -43,7 +47,10 @@ def make_runtime(args: argparse.Namespace, *, with_camera: bool) -> tuple[Capabi
     if args.simulate:
         runtime, rig = make_sim_runtime(make_rig(moving_object=True), data_dir=args.data_dir)
         return CapabilityRegistry(runtime), rig
-    camera = OpenCvCamera(args.camera) if with_camera else None
+    camera = None
+    if with_camera:
+        camera = (HikCamera(args.hik or None, exposure_us=args.exposure_us)
+                  if args.hik is not None else OpenCvCamera(args.camera))
     return CapabilityRegistry(Runtime(camera=camera, data_dir=args.data_dir)), None
 
 

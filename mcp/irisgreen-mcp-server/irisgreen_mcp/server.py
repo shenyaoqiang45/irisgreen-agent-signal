@@ -124,7 +124,11 @@ def make_runtime(args: argparse.Namespace) -> Runtime:
         return runtime
 
     camera = None
-    if args.camera is not None:
+    if args.hik is not None:
+        from irisgreen_capability import HikCamera
+
+        camera = HikCamera(args.hik or None, exposure_us=args.exposure_us)
+    elif args.camera is not None:
         from irisgreen_capability import OpenCvCamera
 
         camera = OpenCvCamera(args.camera)
@@ -139,6 +143,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="use a simulated projector, camera and wall (no hardware)")
     parser.add_argument("--camera", type=int, default=None,
                         help="OpenCV camera index; omit for no camera")
+    parser.add_argument("--hik", nargs="?", const="", default=None, metavar="SERIAL",
+                        help="use a Hikrobot camera through the MVS SDK (optionally by serial number)")
+    parser.add_argument("--exposure-us", type=float, default=None,
+                        help="manual exposure for the Hik camera, in microseconds")
     parser.add_argument("--data-dir", default="irisgreen_data",
                         help="directory for calibration files and input images")
     return parser.parse_args(argv)

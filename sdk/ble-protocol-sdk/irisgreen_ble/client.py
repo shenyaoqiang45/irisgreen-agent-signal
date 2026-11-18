@@ -159,14 +159,30 @@ class IrisClient:
     async def set_keystone_mode(self, mode: int) -> P.Response:
         return await self.send_command(P.cmd_set_keystone(mode))
 
+    async def get_keystone_angle(self) -> int | None:
+        resp = await self.send_command(P.build_read(P.CMD_KEYSTONE_ANGLE))
+        return P.decode_keystone_angle(resp.data[0]) if resp.ok and resp.data else None
+
     async def set_keystone_angle(self, angle: int) -> P.Response:
         return await self.send_command(P.cmd_set_keystone_angle(angle))
+
+    async def get_fov(self) -> int | None:
+        resp = await self.send_command(P.build_read(P.CMD_FOV))
+        return resp.data[0] if resp.ok and resp.data else None
 
     async def set_fov(self, level: int) -> P.Response:
         return await self.send_command(P.cmd_set_fov(level))
 
+    async def get_mirror(self) -> bool | None:
+        resp = await self.send_command(P.build_read(P.CMD_MIRROR))
+        return bool(resp.data[0]) if resp.ok and resp.data else None
+
     async def set_mirror(self, enable: bool) -> P.Response:
         return await self.send_command(P.cmd_set_mirror(enable))
+
+    async def get_flip(self) -> bool | None:
+        resp = await self.send_command(P.build_read(P.CMD_FLIP))
+        return bool(resp.data[0]) if resp.ok and resp.data else None
 
     async def set_flip(self, upside_down: bool) -> P.Response:
         return await self.send_command(P.cmd_set_flip(upside_down))

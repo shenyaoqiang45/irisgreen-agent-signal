@@ -4,28 +4,45 @@ Everything above the BLE layer is tested against a simulator. This checklist is 
 
 Legend: **V0.x** is the roadmap version the item accepts.
 
+## PC results so far (2026-11-18)
+
+Rig: Windows PC with a BLE adapter, `Iris-G-817162` (`20:6E:F1:81:71:62`, firmware `36130326071700`), Hikrobot MV-CA013-A0UM camera (USB3, mono, 1280x1024) on the MVS SDK. Tools: [verify_pc.py](../protocol/python/bleak/verify_pc.py) (read-only) and [verify_transfer.py](../protocol/python/bleak/verify_transfer.py) (changes the group-1 slot).
+
+| Area | Result |
+|---|---|
+| V0.1 GATT (PC) | **Pass.** All services and characteristics match the spec with the documented properties; MTU 512; firmware and manufacturer readable; status frames match the 8-byte shape. `B6B7CA` (firmware `36130326032001`) passes the same checks read-only. |
+| Command round trips | **Pass.** Response prefix is `0x80`. Brightness, flip and keystone mode write and read back correctly; keystone angle, FOV and mirror are acknowledged and readable. Round trip about 160-220 ms. |
+| Image transfer | **Pass.** 38462-byte stream in about 4.0 s (9.5 KiB/s at MTU 512). **50 of 50** consecutive uploads succeeded (mean 4.14 s) and the projection was still correct afterwards. |
+| Orientation | **Finding.** With mirror 0 (the default) the camera sees the projection **horizontally mirrored**: not vertically flipped, but a solid square authored top-left appears top-right and text reads backwards. With mirror 1 it matches the authored image. The pixel packing is unchanged and correct; calibration absorbs the mirroring, but full-field images and text need mirror 1 (or pre-mirrored content). |
+| Identity | **Finding.** This unit's Model and Serial characteristics and the SN / model / name commands return empty (never provisioned). The battery characteristic reads `0x64` = 100, which looks like a percentage. |
+| Camera | **Finding.** Opening a DirectShow camera before BLE breaks Bleak ("Thread is configured for Windows GUI"). Cameras now open lazily on a worker thread. The Hik camera works through `HikCamera`. |
+
+Settings are restored after each test (brightness 80, flip 0, keystone mode 0 and angle 0, mirror 0, FOV 2). FOV 2 (20x10) is the unit's original level, inferred from its projection footprint before any change, since it was not read first.
+
+Still to do on PC: calibration, projection, tracking and the MCP server on real hardware (sections 3-7), reconnect and interrupted-transfer behaviour, minimum safe pacing, and the Android and iOS runs.
+
 ## 0. Test setup
 
-- [ ] IrisGreen charged, firmware version recorded (`device_get_status` / `connect_demo.py` prints it)
-- [ ] Test wall: flat, matte, 1.5-3 m from the projector, dim room
-- [ ] USB camera on a fixed mount seeing the whole projection area; exposure and focus locked
+- [x] IrisGreen charged, firmware version recorded (`36130326071700`)
+- [ ] Test wall: flat, matte, 1.5-3 m from the projector, dim room (pegboard wall, dim room; distance not measured)
+- [x] Camera on a fixed mount seeing the projection area (Hik MV-CA013-A0UM); exposure 60 ms used for the tests
 - [ ] Camera, projector and wall do not move during calibration
-- [ ] Devices on hand: one Windows/Linux PC with a BLE adapter, one Android phone (note OS version), one iPhone (note iOS version)
-- [ ] `python -m pytest` and `flutter test` pass on the machine being used
+- [ ] Devices on hand: one Windows/Linux PC with a BLE adapter, one Android phone (note OS version), one iPhone (note iOS version): PC only so far
+- [x] `python -m pytest` and `flutter test` pass on the machine being used (115 and 37)
 
 ## 1. V0.1 GATT Profile: connect and discover
 
 Goal: PC, Android and iOS can connect and see the documented GATT layout.
 
 **PC (Python + Bleak)**
-- [ ] `python protocol/python/bleak/connect_demo.py` finds the device by name prefix `Iris-G` and by service UUID
-- [ ] Connects, reads model, serial, firmware, manufacturer; values look sane
-- [ ] Negotiated MTU is printed and matches the documented 512 (record the real value)
-- [ ] Every UUID in [irisgreen-gatt.json](../protocol/gatt/specification/irisgreen-gatt.json) is present with the documented properties (read, notify, write, write-without-response, indicate)
-- [ ] File-transfer service `adb40006-...-0001`: start / data / end characteristics match the UUID suffix mapping (not the spreadsheet order)
-- [ ] Battery characteristic returns 4 bytes; record the value at known charge levels to settle its units
-- [ ] Unsolicited status frames on `adb40002` match the 8-byte `00 00 01 .. 00` shape
-- [ ] Reconnect after disconnect works; connecting twice in a row does not wedge the device (a known firmware issue if a handshake is interrupted)
+- [x] `verify_pc.py` finds the device by name prefix `Iris-G` and by service UUID
+- [x] Connects, reads firmware and manufacturer; model and serial are empty on this unit
+- [x] Negotiated MTU is 512, matching the documented value
+- [x] Every UUID in [irisgreen-gatt.json](../protocol/gatt/specification/irisgreen-gatt.json) is present with the documented properties (read, notify, write, write-without-response, indicate)
+- [x] File-transfer service `adb40006-...-0001`: start / data / end characteristics match the UUID suffix mapping (not the spreadsheet order)
+- [ ] Battery characteristic returns 4 bytes (`64000000`); record the value at known charge levels to settle its units
+- [x] Unsolicited status frames on `adb40002` match the 8-byte `00 00 01 .. 00` shape
+- [ ] Reconnect after disconnect works; connecting twice in a row does not wedge the device (a known firmware issue if a handshake is interrupted); every run so far reconnected fine, not yet tested deliberately
 
 **Android (Flutter)**
 - [ ] Runtime permissions: `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` (Android 12+), `ACCESS_FINE_LOCATION` (Android 11 and below)
@@ -48,23 +65,23 @@ Goal: PC, Android and iOS can connect and see the documented GATT layout.
 Goal: images and commands transfer reliably on every platform.
 
 **Commands (each platform)**
-- [ ] Read brightness, picture count
-- [ ] Set brightness (0, 50, 100) and see the effect
-- [ ] Keystone mode 0-3 and angle -70, -10, 0, 10, 70 (confirm negative encoding `70 + abs`)
-- [ ] FOV levels 0-2, mirror, flip behave as documented
-- [ ] Play a built-in material group, stop, delete a group
-- [ ] Confirm the documented response prefix (`80`, or `08`) the device really sends; record it
+- [x] Read brightness, picture count (PC; picture count 37 on `B6B7CA`)
+- [x] Set brightness (0, 50, 100) and read it back (PC); visible effect not yet checked by camera
+- [ ] Keystone mode 0-3 verified by read-back (PC); keystone angle -10, 0, 10 acknowledged but the effect and the full -70..70 range are not checked
+- [ ] FOV levels 0-2 acknowledged and measured through the camera (levels 0 and 1 project a much smaller footprint than 2); mirror and flip read back; flip effect not checked visually (PC)
+- [ ] Play a built-in material group, stop, delete a group: custom group 1 play and stop only; delete not tested
+- [x] Confirm the documented response prefix (`80`, or `08`) the device really sends; it is `80` (PC)
 - [ ] Confirm status frames never get mistaken for responses under load
 
 **Image transfer (each platform)**
-- [ ] Upload the 38462-byte test stream via start / data / end; the device shows the image
-- [ ] Orientation is correct: use an asymmetric test image (corner marks) to rule out flip and mirror errors
-- [ ] Chunking at the real MTU; also at a forced low MTU (23) to prove the fallback
-- [ ] Pacing (100 ms after start, 30 ms between chunks) is sufficient; find the minimum that stays reliable, and the point where it fails
-- [ ] Repeat upload 50 times in a row: no corruption, no hang
+- [x] Upload the 38462-byte test stream via start / data / end; the device shows the image (PC)
+- [x] Orientation checked with an asymmetric test image (PC): mirrored with mirror 0, as authored with mirror 1; not vertically flipped
+- [ ] Chunking verified at the real MTU 512 (509-byte chunks); the forced low-MTU fallback is not tested
+- [ ] Pacing (100 ms after start, 30 ms between chunks) is sufficient (50 of 50 uploads at about 4.1 s); the minimum reliable pacing is not yet measured
+- [x] Repeat upload 50 times in a row: no corruption, no hang (PC; Android and iOS not yet)
 - [ ] Android and iOS output is byte-identical to PC for the same image (capture the written stream and compare)
 - [ ] Interrupted transfer (move out of range, kill the app mid-upload): device recovers, next upload works
-- [ ] Group 1 behaviour: overwrite `1_1.bmp` and play without deleting avoids blanking; confirm the 10-frame limit
+- [ ] Group 1 behaviour: overwrite `1_1.bmp` and play without deleting works (used in every run); the 10-frame limit is not confirmed
 
 **Acceptance (V0.2):** the same image and commands produce the same result on PC, Android and iOS, with no failures in the repeat run.
 
@@ -81,7 +98,7 @@ Goal: images and commands transfer reliably on every platform.
 
 ## 4. Camera and calibration
 
-- [ ] `OpenCvCamera` opens the camera on Windows; note backend, resolution and frame latency (the 4-frame flush may need tuning)
+- [x] `HikCamera` opens the Hik MV-CA013-A0UM on Windows (1280x1024, mono) once the MVS SDK is installed; `OpenCvCamera` is for UVC cameras only. Frame latency and flush count not tuned
 - [ ] `camera.capture` shows a sharp frame; `overlay_field` outlines the real projectable area after calibration
 - [ ] `detect_dot` finds the real laser dot: record threshold, exposure and room light that work; try a bright room and a dim room
 - [ ] Saturated (white) dot centre still detected
@@ -94,7 +111,7 @@ Goal: images and commands transfer reliably on every platform.
 
 ## 5. V0.4 MCP server with a real agent
 
-- [ ] `python -m irisgreen_mcp --camera 0` starts without `--simulate`
+- [ ] `python -m irisgreen_mcp --hik` (or `--camera 0` for a UVC camera) starts without `--simulate`
 - [ ] Connect it to at least two MCP clients (for example VS Code / Copilot and Claude Desktop); tools list with the underscore names
 - [ ] An agent completes: connect, capture, calibrate, project a point, clear
 - [ ] `camera_capture` image content is actually visible to the model
@@ -142,8 +159,8 @@ For each failure found:
 
 | Version | Verified on | Date | Notes |
 |---|---|---|---|
-| V0.1 | | | |
-| V0.2 | | | |
+| V0.1 | PC (Bleak, Windows), `Iris-G-817162` fw 36130326071700. Android and iOS pending | 2026-11-18 | PC passes. Model and serial are empty on this unit |
+| V0.2 | PC (Bleak, Windows), same unit, Hik camera. Android and iOS pending | 2026-11-18 | PC passes: 50 of 50 uploads. Mirror 0 shows the image mirrored |
 | V0.3 | | | |
 | V0.4 | | | |
 | V0.5 | | | |

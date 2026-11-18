@@ -326,8 +326,8 @@ AI-native physical interaction.**
 
 | Version | Goal | Acceptance | Status |
 |---|---|---|---|
-| V0.1 | IrisGreen GATT Profile | PC, Android and iOS can connect | Specified and implemented ([docs](docs/gatt-profile.md)); real-device connection on Android and iOS not yet verified |
-| V0.2 | BLE Protocol SDK | Images and commands transfer across platforms | Python and Flutter SDKs agree on shared golden vectors; real-device transfer not yet verified |
+| V0.1 | IrisGreen GATT Profile | PC, Android and iOS can connect | Specified and implemented ([docs](docs/gatt-profile.md)). **Verified on PC** with a real IrisGreen; Android and iOS not yet verified |
+| V0.2 | BLE Protocol SDK | Images and commands transfer across platforms | Python and Flutter SDKs agree on shared golden vectors. **Verified on PC**: commands, and 50 of 50 image uploads on a real device; Android and iOS not yet verified |
 | V0.3 | Capability SDK | Unified projection, camera and status interfaces | Implemented ([spec](docs/capability-spec.md)), tested against the simulator |
 | V0.4 | MCP Server | An AI Agent can call the device | Implemented, 16 tools, tested over in-memory and stdio MCP |
 | V0.5 | Reference Algorithms | Reference tracking, calibration and mapping | Implemented ([algorithms](algorithms)) |

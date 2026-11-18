@@ -86,6 +86,18 @@ void main() {
     expect(await IrisClient(t).getPictureCount(), 300);
   });
 
+  test('settings read back through their read commands', () async {
+    final t = FakeTransport(reply: (f) {
+      final value = {p.cmdFov: 2, p.cmdMirror: 1, p.cmdFlip: 0, p.cmdKeystoneAngle: 80}[f[0]]!;
+      return [[0x80, f[0], 1, value]];
+    });
+    final c = IrisClient(t);
+    expect(await c.getFov(), 2);
+    expect(await c.getMirror(), isTrue);
+    expect(await c.getFlip(), isFalse);
+    expect(await c.getKeystoneAngle(), -10); // 80 encodes -10
+  });
+
   test('pushFile sends start, chunked data, end', () async {
     final stream = Uint8List.fromList(
         [for (var i = 0; i < 1024; i++) i & 0xFF]);

@@ -12,13 +12,16 @@ From the repository root, with the dependencies from [requirements.txt](../../re
 set PYTHONPATH=sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;algorithms/calibration;algorithms/coordinate-mapping;algorithms/detection;algorithms/tracking;mcp/irisgreen-mcp-server
 
 python -m irisgreen_mcp --simulate                 # simulated device, camera and wall
-python -m irisgreen_mcp --camera 0                 # real IrisGreen and USB camera
+python -m irisgreen_mcp --camera 0                 # real IrisGreen and a UVC (USB webcam) camera
+python -m irisgreen_mcp --hik --exposure-us 60000  # real IrisGreen and a Hikrobot camera (needs the MVS SDK)
 ```
 
 | Option | Meaning |
 |---|---|
 | `--simulate` | Simulated projector, camera and a moving object; no hardware |
-| `--camera N` | OpenCV camera index. Without it there is no camera (projection only) |
+| `--camera N` | OpenCV (UVC) camera index. Without a camera option there is no camera (projection only) |
+| `--hik [SERIAL]` | Hikrobot USB3 Vision camera through the MVS SDK (OpenCV cannot open these); first USB3 camera unless a serial is given |
+| `--exposure-us US` | Manual exposure for the Hik camera. A short exposure keeps the laser dot from saturating |
 | `--data-dir DIR` | Where calibration files and input images live (default `irisgreen_data`). Agent-supplied paths cannot leave it |
 
 ## Client configuration

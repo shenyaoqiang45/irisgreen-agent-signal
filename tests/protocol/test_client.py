@@ -71,6 +71,19 @@ def test_high_level_getters():
     assert run(IrisClient(t).get_picture_count()) == 300
 
 
+def test_settings_read_back_through_their_read_commands():
+    values = {P.CMD_FOV: 2, P.CMD_MIRROR: 1, P.CMD_FLIP: 0, P.CMD_KEYSTONE_ANGLE: 80}
+    t = FakeTransport(reply=lambda frame: [bytes([0x80, frame[0], 1, values[frame[0]]])])
+    client = IrisClient(t)
+
+    async def go():
+        return (await client.get_fov(), await client.get_mirror(),
+                await client.get_flip(), await client.get_keystone_angle())
+
+    assert run(go()) == (2, True, False, -10)  # 80 encodes -10
+    assert [P.decode_keystone_angle(P.cmd_set_keystone_angle(a)[2]) for a in (-70, -1, 0, 5, 70)] == [-70, -1, 0, 5, 70]
+
+
 def test_push_file_sequence(monkeypatch):
     monkeypatch.setattr(client_module, "START_DELAY_S", 0)
     monkeypatch.setattr(client_module, "PACKET_DELAY_S", 0)

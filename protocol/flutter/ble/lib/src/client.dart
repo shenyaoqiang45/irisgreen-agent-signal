@@ -151,13 +151,33 @@ class IrisClient {
   Future<p.Response> setKeystoneMode(int mode) =>
       sendCommand(p.cmdSetKeystone(mode));
 
+  Future<int?> getKeystoneAngle() async {
+    final r = await sendCommand(p.buildRead(p.cmdKeystoneAngle));
+    return r.ok && r.data.isNotEmpty ? p.decodeKeystoneAngle(r.data[0]) : null;
+  }
+
   Future<p.Response> setKeystoneAngle(int angle) =>
       sendCommand(p.cmdSetKeystoneAngle(angle));
 
+  Future<int?> getFov() async {
+    final r = await sendCommand(p.buildRead(p.cmdFov));
+    return r.ok && r.data.isNotEmpty ? r.data[0] : null;
+  }
+
   Future<p.Response> setFov(int level) => sendCommand(p.cmdSetFov(level));
+
+  Future<bool?> getMirror() async {
+    final r = await sendCommand(p.buildRead(p.cmdMirror));
+    return r.ok && r.data.isNotEmpty ? r.data[0] != 0 : null;
+  }
 
   Future<p.Response> setMirror(bool enable) =>
       sendCommand(p.cmdSetMirror(enable));
+
+  Future<bool?> getFlip() async {
+    final r = await sendCommand(p.buildRead(p.cmdFlip));
+    return r.ok && r.data.isNotEmpty ? r.data[0] != 0 : null;
+  }
 
   Future<p.Response> setFlip(bool upsideDown) =>
       sendCommand(p.cmdSetFlip(upsideDown));

@@ -40,10 +40,10 @@ CMD_LAYOUT = 0x19            # write:1   0=minimal 1=standard
 CMD_SPEED_UNIT = 0x1A        # write:1   0=KMH 1=MPH
 CMD_LOW_BATTERY = 0x1B       # write:1   percent
 
-CMD_KEYSTONE_MODE = 0x1C     # write:1   0=off 1=left right-angle 2=isosceles 3=right right-angle
-CMD_KEYSTONE_ANGLE = 0x1D    # write:1   -70~70; >70 encodes a negative
-CMD_MIRROR = 0x1E            # write:1   0/1
-CMD_FOV = 0x1F               # write:1   0=10*5 1=30*10 2=20*10
+CMD_KEYSTONE_MODE = 0x1C     # read:0  write:1   0=off 1=left right-angle 2=isosceles 3=right right-angle
+CMD_KEYSTONE_ANGLE = 0x1D    # read:0  write:1   -70~70; >70 encodes a negative
+CMD_MIRROR = 0x1E            # read:0  write:1   0/1, default 0
+CMD_FOV = 0x1F               # read:0  write:1   0=10*5 (default) 1=30*10 2=20*10
 
 CMD_PLAY = 0xA0              # write:6  play a full-frame material group
 CMD_PLAY_STOP = 0xA1         # write:1
@@ -201,6 +201,11 @@ def cmd_set_keystone_angle(angle: int) -> bytes:
     if not -70 <= angle <= 70:
         raise ValueError("angle must be in -70..70")
     return build_write(CMD_KEYSTONE_ANGLE, [angle if angle >= 0 else 70 + abs(angle)])
+
+
+def decode_keystone_angle(value: int) -> int:
+    """Inverse of the angle encoding: a value above 70 is a negative angle."""
+    return value if value <= 70 else -(value - 70)
 
 
 def cmd_set_fov(level: int) -> bytes:

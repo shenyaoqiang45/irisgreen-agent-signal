@@ -27,11 +27,11 @@ Response, delivered as an indication on the same characteristic:
 |---|---|---|
 | `0x05` | Picture count | read, returns u16 |
 | `0x11` | Brightness | 1 byte, 0-100 |
-| `0x12` | Flip | 0 upright, 1 upside-down |
-| `0x1C` | Keystone mode | 0 off, 1 left right-angle, 2 isosceles, 3 right right-angle |
-| `0x1D` | Keystone angle | -70..70; negatives are sent as `70 + abs(angle)` |
-| `0x1E` | Mirror | 0 / 1 |
-| `0x1F` | FOV | 0 = 10x5, 1 = 30x10, 2 = 20x10 |
+| `0x12` | Flip | read, or write 0 upright / 1 upside-down |
+| `0x1C` | Keystone mode | read, or write 0 off, 1 left right-angle, 2 isosceles, 3 right right-angle |
+| `0x1D` | Keystone angle | read, or write -70..70; negatives are sent as `70 + abs(angle)` |
+| `0x1E` | Mirror | read, or write 0 / 1 (default 0). With 0, the projected image appears horizontally mirrored on the wall as seen by a camera facing it; 1 shows it as authored (verified on hardware) |
+| `0x1F` | FOV | read, or write 0 = 10x5 (documented default), 1 = 30x10, 2 = 20x10 |
 | `0xA0` | Play material group | `loop(1) total_100ms(u16) interval_100ms(u16) group_id(1)`; total capped at 36000 |
 | `0xA1` | Stop playback | `01` |
 | `0xA2` | Delete material group | group id |
