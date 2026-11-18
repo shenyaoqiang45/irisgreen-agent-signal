@@ -53,6 +53,10 @@ class SimTransport(Transport):
     def mtu(self) -> int:
         return self._mtu
 
+    @property
+    def is_connected(self) -> bool:
+        return self.connected
+
     async def read(self, uuid: str) -> bytes:
         if uuid not in self.reads:
             raise KeyError(uuid)

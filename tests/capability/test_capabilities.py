@@ -177,6 +177,19 @@ def test_connect_uses_the_default_address_when_none_is_given(tmp_path):
     assert all(r["ok"] for r in results) and seen == ["AA:BB", "CC:DD"]
 
 
+def test_a_dropped_link_is_reconnected_before_the_next_projection(stack):
+    registry, runtime, rig = stack
+    run_all(registry, [("device.connect", {})])
+    rig.transport.connected = False  # the device or the OS closed the link while idle
+
+    async def go():
+        return [await registry.call("project.point", {"x": 100, "y": 100}), await registry.call("project.clear", {})]
+
+    shown, cleared = asyncio.run(go())
+    assert shown["ok"] and cleared["ok"] and rig.transport.connected
+    assert not rig.world.mask.any()
+
+
 # ---------- rendering ----------
 
 def test_dot_image_has_one_filled_dot():

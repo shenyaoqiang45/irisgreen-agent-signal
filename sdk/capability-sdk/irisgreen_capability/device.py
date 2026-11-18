@@ -86,6 +86,18 @@ class IrisDevice:
         if not self.connected:
             raise CapabilityError(NOT_CONNECTED, "no device connected; call device.connect first")
 
+    async def _ensure_link(self) -> None:
+        """Reconnect if the BLE link dropped while idle (the device or the OS may close it)."""
+        if self.client.transport.is_connected:
+            return
+        try:
+            await self.client.connect()
+        except Exception as exc:
+            self.connected = False
+            raise CapabilityError(
+                DEVICE_ERROR, f"the Bluetooth link dropped and reconnecting failed: {exc}; call device.connect"
+            ) from exc
+
     def status(self) -> dict:
         info = self.client.info
         return {
@@ -115,6 +127,7 @@ class IrisDevice:
             raise CapabilityError(INVALID_ARGUMENT, str(exc)) from exc
 
         async with self._lock:
+            await self._ensure_link()
             if not self._slot_ready:
                 deleted = await self.client.send_command(P.cmd_delete_group(SLOT_GROUP))
                 if not deleted.ok:

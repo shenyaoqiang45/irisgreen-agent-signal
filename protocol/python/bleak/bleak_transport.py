@@ -21,10 +21,17 @@ async def scan(timeout: float = 8.0) -> list[tuple[str, str]]:
 class BleakTransport(Transport):
     def __init__(self, address: str, connect_timeout: float = 60.0):
         self.address = address
+        self._timeout = connect_timeout
         self._client = BleakClient(address, timeout=connect_timeout)
 
     async def connect(self) -> None:
+        # A fresh client each time, so this also works for reconnecting after the link dropped.
+        self._client = BleakClient(self.address, timeout=self._timeout)
         await self._client.connect()
+
+    @property
+    def is_connected(self) -> bool:
+        return self._client.is_connected
 
     async def disconnect(self) -> None:
         try:

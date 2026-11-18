@@ -20,6 +20,11 @@ class Transport(ABC):
     async def disconnect(self) -> None: ...
 
     @property
+    def is_connected(self) -> bool:
+        """False once the link has dropped. Transports that cannot tell may keep the default."""
+        return True
+
+    @property
     @abstractmethod
     def mtu(self) -> int:
         """Negotiated ATT MTU, or 0 if unknown."""
