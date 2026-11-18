@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from typing import Any
 
@@ -109,9 +110,13 @@ def make_runtime(args: argparse.Namespace) -> Runtime:
         from irisgreen_capability.sim import make_sim_runtime
 
         runtime, _ = make_sim_runtime(data_dir=args.data_dir, fast=True)
+        runtime.mirror_full_field = not args.no_pre_mirror
+        runtime.default_address = args.address
         return runtime
 
-    return Runtime(data_dir=args.data_dir, mirror_full_field=not args.no_pre_mirror)
+    return Runtime(
+        data_dir=args.data_dir, mirror_full_field=not args.no_pre_mirror, default_address=args.address
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -120,6 +125,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--simulate", action="store_true",
                         help="use a simulated projector (no hardware)")
+    parser.add_argument("--address", default=os.environ.get("IRISGREEN_ADDRESS") or None,
+                        help="default BLE address for device_connect (env IRISGREEN_ADDRESS); "
+                             "needed when more than one projector is in range")
     parser.add_argument("--no-pre-mirror", action="store_true",
                         help="do not mirror full-field images (use when the device's mirror setting is 1)")
     parser.add_argument("--data-dir", default="irisgreen_data",

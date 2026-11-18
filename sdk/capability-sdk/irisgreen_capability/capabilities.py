@@ -96,15 +96,15 @@ def build_capabilities(rt: Runtime) -> list[Capability]:
 
     @cap(
         "device.connect",
-        "Connect to an IrisGreen projector over Bluetooth. Omit address to use the only "
-        "device in range. Must be called before any projection.",
+        "Connect to an IrisGreen projector over Bluetooth. Omit address to use the configured "
+        "default or the only device in range. Must be called before any projection.",
         _object({"address": {"type": "string", "description": "BLE address or platform id"}}),
         _result({"model": {"type": "string"}, "serial": {"type": "string"}, "mtu": {"type": "integer"}}),
     )
     async def device_connect(args: dict) -> dict:
         if rt.device is not None and rt.device.connected:
             return {"ok": True, "already_connected": True, **rt.device.status()}
-        transport, address = await rt.transport_factory(args.get("address"))
+        transport, address = await rt.transport_factory(args.get("address") or rt.default_address)
         device = IrisDevice(
             transport, address, settle_s=rt.settle_s, clear_s=rt.clear_s,
             transfer_delay_s=rt.transfer_delay_s,

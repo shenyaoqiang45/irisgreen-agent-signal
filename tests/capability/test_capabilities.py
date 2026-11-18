@@ -159,6 +159,24 @@ def test_disconnect_then_project_fails(stack):
     assert results[1]["ok"] and results[2]["error"]["code"] == "not_connected"
 
 
+def test_connect_uses_the_default_address_when_none_is_given(tmp_path):
+    runtime, _ = make_sim_runtime(data_dir=str(tmp_path))
+    seen = []
+    inner = runtime.transport_factory
+
+    async def spy(address):
+        seen.append(address)
+        return await inner(address)
+
+    runtime.transport_factory = spy
+    runtime.default_address = "AA:BB"
+    registry = CapabilityRegistry(runtime)
+    results = run_all(registry, [
+        ("device.connect", {}), ("device.disconnect", {}), ("device.connect", {"address": "CC:DD"}),
+    ])
+    assert all(r["ok"] for r in results) and seen == ["AA:BB", "CC:DD"]
+
+
 # ---------- rendering ----------
 
 def test_dot_image_has_one_filled_dot():

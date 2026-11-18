@@ -92,6 +92,25 @@ def test_agent_flow_connect_project_image_and_clear(tmp_path):
     assert not rig.world.mask.any()
 
 
+def test_launch_script_needs_no_pythonpath(tmp_path):
+    """The command the client configs use: a bare interpreter plus launch.py."""
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(ROOT / "mcp" / "irisgreen-mcp-server" / "launch.py"),
+              "--simulate", "--address", "AA:BB", "--data-dir", str(tmp_path)],
+        env=env,
+    )
+
+    async def go():
+        async with Client(params) as client:
+            connected = await client.call_tool("device_connect", {})
+            return connected
+
+    connected = asyncio.run(asyncio.wait_for(go(), 60))
+    assert not connected.is_error and structured(connected)["address"] == "AA:BB"
+
+
 def test_stdio_entry_point_serves_the_simulator(tmp_path):
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(

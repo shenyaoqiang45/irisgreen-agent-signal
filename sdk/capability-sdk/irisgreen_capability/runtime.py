@@ -48,6 +48,7 @@ class Runtime:
         clear_s: float = 0.5,
         transfer_delay_s: float | None = None,
         mirror_full_field: bool = False,
+        default_address: str | None = None,
     ):
         self.device = device
         self.transport_factory = transport_factory
@@ -55,6 +56,8 @@ class Runtime:
         self.settle_s = settle_s
         self.clear_s = clear_s
         self.transfer_delay_s = transfer_delay_s
+        # Used by device.connect when the caller gives no address (several projectors may be in range).
+        self.default_address = default_address
         # With the device's mirror setting at 0 the wall shows a full-field image horizontally
         # mirrored, so such images are mirrored first.
         self.mirror_full_field = mirror_full_field

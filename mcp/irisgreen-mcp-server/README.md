@@ -9,36 +9,39 @@ Exposes the [capability set](../../docs/capability-spec.md) to AI agents as MCP 
 From the repository root, with the dependencies from [requirements.txt](../../requirements.txt):
 
 ```text
-set PYTHONPATH=sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;mcp/irisgreen-mcp-server
-
-python -m irisgreen_mcp --simulate     # simulated device
-python -m irisgreen_mcp                # real IrisGreen over Bluetooth
+python mcp/irisgreen-mcp-server/launch.py --simulate     # simulated device, no PYTHONPATH needed
+python mcp/irisgreen-mcp-server/launch.py                # real IrisGreen over Bluetooth
 ```
+
+[launch.py](launch.py) puts the repository's package directories on `sys.path` itself. Without it, set `PYTHONPATH=sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;mcp/irisgreen-mcp-server` and run `python -m irisgreen_mcp`.
 
 | Option | Meaning |
 |---|---|
 | `--simulate` | Simulated projector; no hardware |
-| `--data-dir DIR` | Where input images live (default `irisgreen_data`). Agent-supplied paths cannot leave it |
+| `--address ADDR` | Default BLE address for `device_connect` (or env `IRISGREEN_ADDRESS`). Needed when more than one projector is in range; the agent can still pass its own `address` |
+| `--data-dir DIR` | Where input images live (default `irisgreen_data`; `launch.py` uses the repository's). Agent-supplied paths cannot leave it |
 | `--no-pre-mirror` | Do not mirror full-field `project_image` content. By default it is mirrored, because a device with mirror 0 shows it horizontally mirrored; use this flag if the device's mirror setting is 1 |
 
 ## Client configuration
 
+The repository ships ready-made configs. They run `.venv/Scripts/python.exe` (Windows) with `launch.py` and `--address 20:6E:F1:81:71:62`; edit the address, and the interpreter path on macOS and Linux (`.venv/bin/python`).
+
+| Client | File | Notes |
+|---|---|---|
+| VS Code (Copilot agent mode) | [.vscode/mcp.json](../../.vscode/mcp.json) | Root key `servers`. Open the folder, then start the server from the MCP: List Servers command or the Chat tools picker |
+| Cursor | [.cursor/mcp.json](../../.cursor/mcp.json) | Root key `mcpServers`. Enable `irisgreen` under Settings > MCP |
+| WorkBuddy / CodeBuddy | [.mcp.json](../../.mcp.json) | Root key `mcpServers`, project level. Uses `${IRISGREEN_REPO:-E:/2027/irisgreen-ai-physical-interface}`: set `IRISGREEN_REPO` or edit the default if the clone lives elsewhere |
+
+All three launch the same command, so the same tools appear:
+
 ```json
 {
-  "mcpServers": {
-    "irisgreen": {
-      "command": "python",
-      "args": ["-m", "irisgreen_mcp"],
-      "cwd": "E:/2027/irisgreen-ai-physical-interface",
-      "env": {
-        "PYTHONPATH": "sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;mcp/irisgreen-mcp-server"
-      }
-    }
-  }
+  "command": "<repo>/.venv/Scripts/python.exe",
+  "args": ["<repo>/mcp/irisgreen-mcp-server/launch.py", "--address", "20:6E:F1:81:71:62"]
 }
 ```
 
-(Use `:` instead of `;` as the path separator on macOS and Linux.)
+Claude Desktop and other clients take the same `command` / `args` under `mcpServers` in their own config file.
 
 ## What an agent does
 

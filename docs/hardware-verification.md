@@ -25,8 +25,10 @@ python protocol/python/bleak/verify_mcp_image.py --simulate    # same flow, no h
 - [x] Fix implemented: the MCP server mirrors full-field `project_image` content on hardware (`--no-pre-mirror` turns it off for a device set to mirror 1). Covered by a simulator test
 - [ ] Confirm by eye that the unmodified test image, projected through the fixed server, now reads correctly (the run passed; the wall result is not yet confirmed)
 - [ ] `project_point` in projector space is not mirrored: x is the projector's own coordinate, so a dot at x=100 appears at the right. Decide whether that is acceptable
-- [ ] The same three calls work from a real agent in a real MCP client (VS Code / Copilot, using the config in the [MCP README](../mcp/irisgreen-mcp-server/README.md#client-configuration)), launched by the client, not from a terminal
-- [ ] `project_image` with `image_path` outside `--data-dir` is refused
+- [ ] The same calls work from a real agent in a real MCP client, launched by the client application, not from a terminal. Ready-made configs: VS Code, Cursor, WorkBuddy (see the [MCP README](../mcp/irisgreen-mcp-server/README.md#client-configuration)). Per client: [ ] VS Code / Copilot, [ ] Cursor, [ ] WorkBuddy
+- [x] `project_image` with `image_path` outside `--data-dir` is refused (`invalid_argument`, over MCP on the real device, 2026-11-18)
+- [x] Through the shipped client config command (`.vscode/mcp.json`: interpreter plus `launch.py`, no `PYTHONPATH`, working directory `C:\`): tools list, `device_connect` (default address), `device_get_status`, `project_point`, `project_image`, `project_clear`, `device_disconnect` all succeed on the real device (2026-11-18). A scripted client, not yet VS Code, Cursor or WorkBuddy themselves
+- [ ] Ready-made configs exist for VS Code (`.vscode/mcp.json`), Cursor (`.cursor/mcp.json`) and WorkBuddy (`.mcp.json`); each still has to be tried in its own application with a real agent
 
 Fix found on the way: the `project_image` output schema said `projector_quad` is an array, but it is `null` without a region, so strict MCP clients rejected the result. The field was removed with the camera pipeline; a test still covers a full-field image through the client.
 
@@ -131,7 +133,7 @@ Goal: images and commands transfer reliably on every platform.
 - [ ] Error results (`isError`) lead the agent to the correct recovery (for example `not_connected` leads to `device_connect`; several devices in range leads to passing an address)
 - [ ] BLE permissions work when the server is launched by the client application, not only from a terminal
 - [ ] Server shutdown (client closes) disconnects BLE
-- [ ] Path restriction: an agent asking for a path outside `--data-dir` is refused
+- [x] Path restriction: an agent asking for a path outside `--data-dir` is refused (over MCP on the real device, 2026-11-18)
 
 ## 5. Safety and robustness
 
