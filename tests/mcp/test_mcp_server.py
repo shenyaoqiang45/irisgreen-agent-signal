@@ -45,6 +45,9 @@ def test_lists_every_capability_with_schemas(tmp_path):
     point = next(t for t in listing.tools if t.name == "project_point")
     assert point.input_schema["required"] == ["x", "y"]
     assert point.output_schema["oneOf"][1]["properties"]["ok"] == {"const": False}
+    # the MCP spec requires an object at the root of every schema; strict clients drop the tool otherwise
+    assert all(t.input_schema["type"] == "object" and t.output_schema["type"] == "object"
+               for t in listing.tools)
     assert "project_image" in instructions
 
 

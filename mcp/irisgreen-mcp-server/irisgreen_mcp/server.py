@@ -64,7 +64,7 @@ def build_tools(registry: CapabilityRegistry) -> list[types.Tool]:
             name=tool_name(cap.name),
             description=cap.description,
             input_schema=cap.input_schema,
-            output_schema={"oneOf": [cap.output_schema, ERROR_SCHEMA]},
+            output_schema={"type": "object", "oneOf": [cap.output_schema, ERROR_SCHEMA]},
         )
         for cap in registry
     ]
