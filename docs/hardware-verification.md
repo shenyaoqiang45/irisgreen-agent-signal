@@ -114,13 +114,13 @@ Goal: images and commands transfer reliably on every platform.
 
 ## 3. V0.3 Capability SDK on real hardware
 
-- [ ] `device.connect` with no address finds the only device; with two devices it asks for an address
-- [ ] `project.point` in projector space: corners and centre land where expected
-- [ ] `project.image` with each mode (`threshold`, `otsu`, `dither`, `edges`): real brightness and legibility, record which mode suits which content
-- [ ] `project.clear` really emits no light (check by eye)
-- [ ] One-hour playback cap and `seconds` handling match device behaviour
-- [ ] Measure real upload latency per frame; record the number
-- [ ] `device.disconnect` leaves playback running as documented
+- [ ] `device.connect` with no address finds the only device; with two devices it asks for an address. Done: with two devices in range it lists both and asks for an address, and connecting by address works (2026-11-18). Not done: the single-device case
+- [x] `project.point` in projector space: corners and centre land where expected (checked by eye, 2026-11-18, `Iris-G-817162`: top-left, top-right, bottom-right, bottom-left, centre)
+- [ ] `project.image` with each mode (`threshold`, `otsu`, `dither`, `edges`): all four project and look right by eye (2026-11-18, test image with a gradient disc, `IRIS` and `Hello 123`); which mode suits which content is not recorded yet
+- [x] `project.clear` really emits no light (checked by eye, 2026-11-18)
+- [ ] One-hour playback cap and `seconds` handling match device behaviour. Done: a 6 s request played for 6.0 s and then went out by itself (by eye, 2026-11-18). Not done: the one-hour cap
+- [x] Measure real upload latency per frame: each `project.point` / `project.image` call takes 3.3-3.5 s end to end (upload, stop, play), 4.65 s for a dithered image; `device.connect` takes about 2.6 s (2026-11-18, `Iris-G-817162`, Windows)
+- [x] `device.disconnect` leaves playback running as documented (the dot stayed on after the BLE link dropped, by eye, 2026-11-18)
 - [ ] Battery drain during a 10-minute continuous projection
 
 ## 4. V0.4 MCP server with a real agent
@@ -153,5 +153,5 @@ For each failure found:
 |---|---|---|---|
 | V0.1 | PC (Bleak, Windows), `Iris-G-817162` fw 36130326071700. Android and iOS pending | 2026-11-18 | PC passes. Model and serial are empty on this unit |
 | V0.2 | PC (Bleak, Windows), same unit. Android and iOS pending | 2026-11-18 | PC passes: 50 of 50 uploads. Mirror 0 shows the image mirrored |
-| V0.3 | | | |
+| V0.3 | PC (Bleak, Windows), `Iris-G-817162`, checked by eye | 2026-11-18 | Partial: points, clear, `seconds`, disconnect and the four modes pass. Open: single-device connect, one-hour cap, 10-minute battery drain, mode recommendations |
 | V0.4 | | | |
