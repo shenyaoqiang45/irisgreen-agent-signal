@@ -1,28 +1,25 @@
 # IrisGreen MCP Server
 
-Exposes the [capability set](../../docs/capability-spec.md) to AI agents as MCP tools (roadmap V0.4). The server is only the agent-facing interface; BLE, calibration and tracking live in the [Capability SDK](../../sdk/capability-sdk). The machine running it must have a Bluetooth adapter: MCP does not bypass operating-system Bluetooth permissions.
+Exposes the [capability set](../../docs/capability-spec.md) to AI agents as MCP tools (roadmap V0.4). The server is only the agent-facing interface; BLE and projection live in the [Capability SDK](../../sdk/capability-sdk). The machine running it must have a Bluetooth adapter: MCP does not bypass operating-system Bluetooth permissions.
 
-16 tools, named with underscores (`project_point`, `calibration_calibrate`, `tracking_follow`, ...). Results are JSON text plus structured content, with `isError` set on failure. `camera_capture` returns the frame as image content so the agent can see the wall.
+7 tools, named with underscores: `device_connect`, `device_disconnect`, `device_get_status`, `project_point`, `project_image`, `project_clear`, `project_status`. Results are JSON text plus structured content, with `isError` set on failure. There is no camera ([ADR 0001](../../docs/adr/0001-remove-camera-pipeline.md)): positions are in projector pixels (640x480).
 
 ## Run
 
 From the repository root, with the dependencies from [requirements.txt](../../requirements.txt):
 
 ```text
-set PYTHONPATH=sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;algorithms/calibration;algorithms/coordinate-mapping;algorithms/detection;algorithms/tracking;mcp/irisgreen-mcp-server
+set PYTHONPATH=sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;mcp/irisgreen-mcp-server
 
-python -m irisgreen_mcp --simulate                 # simulated device, camera and wall
-python -m irisgreen_mcp --camera 0                 # real IrisGreen and a UVC (USB webcam) camera
-python -m irisgreen_mcp --hik --exposure-us 60000  # real IrisGreen and a Hikrobot camera (needs the MVS SDK)
+python -m irisgreen_mcp --simulate     # simulated device
+python -m irisgreen_mcp                # real IrisGreen over Bluetooth
 ```
 
 | Option | Meaning |
 |---|---|
-| `--simulate` | Simulated projector, camera and a moving object; no hardware |
-| `--camera N` | OpenCV (UVC) camera index. Without a camera option there is no camera (projection only) |
-| `--hik [SERIAL]` | Hikrobot USB3 Vision camera through the MVS SDK (OpenCV cannot open these); first USB3 camera unless a serial is given |
-| `--exposure-us US` | Manual exposure for the Hik camera. A short exposure keeps the laser dot from saturating |
-| `--data-dir DIR` | Where calibration files and input images live (default `irisgreen_data`). Agent-supplied paths cannot leave it |
+| `--simulate` | Simulated projector; no hardware |
+| `--data-dir DIR` | Where input images live (default `irisgreen_data`). Agent-supplied paths cannot leave it |
+| `--no-pre-mirror` | Do not mirror full-field `project_image` content. By default it is mirrored, because a device with mirror 0 shows it horizontally mirrored; use this flag if the device's mirror setting is 1 |
 
 ## Client configuration
 
@@ -31,10 +28,10 @@ python -m irisgreen_mcp --hik --exposure-us 60000  # real IrisGreen and a Hikrob
   "mcpServers": {
     "irisgreen": {
       "command": "python",
-      "args": ["-m", "irisgreen_mcp", "--camera", "0"],
+      "args": ["-m", "irisgreen_mcp"],
       "cwd": "E:/2027/irisgreen-ai-physical-interface",
       "env": {
-        "PYTHONPATH": "sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;algorithms/calibration;algorithms/coordinate-mapping;algorithms/detection;algorithms/tracking;mcp/irisgreen-mcp-server"
+        "PYTHONPATH": "sdk/ble-protocol-sdk;sdk/capability-sdk;protocol/python/bleak;mcp/irisgreen-mcp-server"
       }
     }
   }
@@ -45,11 +42,18 @@ python -m irisgreen_mcp --hik --exposure-us 60000  # real IrisGreen and a Hikrob
 
 ## What an agent does
 
-1. `device_connect`, `camera_capture` to see the wall.
-2. `calibration_calibrate` once, keeping everything still.
-3. `camera_capture` with `overlay_field` to see the projectable area, choose a target, then `project_point` (`space: "camera"`), `project_image` (with `region`) or `tracking_start` + `tracking_follow`.
-4. `project_clear` before `device_disconnect`.
+1. `device_connect` (with `address` when several projectors are in range).
+2. `project_image` (or `project_point`), then `project_status` if it wants to confirm.
+3. `project_clear` before `device_disconnect`.
 
 The server's `instructions` field tells the agent this flow.
+
+## Check it on a real device
+
+[verify_mcp_image.py](../../protocol/python/bleak/verify_mcp_image.py) starts this server and acts as the MCP client:
+
+```text
+python protocol/python/bleak/verify_mcp_image.py --address 20:6E:F1:81:71:62 --seconds 10
+```
 
 Tests: [tests/mcp](../../tests/mcp), including a real stdio subprocess.

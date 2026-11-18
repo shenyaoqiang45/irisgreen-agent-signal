@@ -43,8 +43,8 @@ The full list of defined command types and material group IDs is in [protocol.py
 Images are uploaded through the file-transfer service.
 
 1. Pack the 640x480 binary image into a 38462-byte stream (below).
-2. Write the **file packet** to `file_start` (with response), then wait about 100 ms.
-3. Write the stream to `file_data` in chunks of `MTU - 3` bytes (without response), about 30 ms apart.
+2. Write the **file packet** to `file_start` (with response), then wait 50 ms.
+3. Write the stream to `file_data` in chunks of `MTU - 3` bytes (without response). On PC (Bleak) the writes are flow-controlled by the BLE stack, so a 5 ms gap is enough: an upload takes about 2.8 s at MTU 512 and a gap of 0 gives the same time. The earlier 100 ms / 30 ms pacing took about 4.1 s. Other platforms should confirm their own minimum.
 4. Write the same file packet to `file_end` (with response).
 
 File packet: `size(u32, big-endian) | name(UTF-8, NUL-padded to at least 16 bytes)`.
@@ -58,4 +58,4 @@ File packet: `size(u32, big-endian) | name(UTF-8, NUL-padded to at least 16 byte
 
 Pixel data is the image rotated 180 degrees (mirrored horizontally, flipped vertically, because the device reads BMP rows bottom-up), flattened row-major, 8 pixels per byte, most significant bit first. A set bit is a lit pixel.
 
-Binarization (threshold, Otsu, dithering, edge extraction) is not part of the protocol; it belongs to the algorithms layer.
+Binarization (threshold, Otsu, dithering, edge extraction) is not part of the protocol; it belongs to the capability SDK's `render` module.

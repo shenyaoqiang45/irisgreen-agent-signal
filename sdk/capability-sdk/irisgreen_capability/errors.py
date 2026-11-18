@@ -4,14 +4,9 @@ from __future__ import annotations
 
 # Machine-readable error codes. Agents branch on these, so keep them stable.
 NOT_CONNECTED = "not_connected"
-NO_CAMERA = "no_camera"
-NO_CALIBRATION = "no_calibration"
 OUT_OF_FIELD = "out_of_field"
 INVALID_ARGUMENT = "invalid_argument"
-TRACKING_LOST = "tracking_lost"
-NOT_TRACKING = "not_tracking"
 DEVICE_ERROR = "device_error"
-CALIBRATION_FAILED = "calibration_failed"
 INTERNAL = "internal_error"
 
 

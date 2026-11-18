@@ -6,14 +6,13 @@ import numpy as np
 import pytest
 
 from irisgreen_capability import CapabilityRegistry
-from irisgreen_capability.sim import make_rig, make_sim_runtime
-from irisgreen_mapping import Calibration
+from irisgreen_capability.render import make_dot_image, to_1bpp
+from irisgreen_capability.sim import make_sim_runtime
 
 
 @pytest.fixture
 def stack(tmp_path):
-    """Static scene: calibration assumes nothing moves."""
-    runtime, rig = make_sim_runtime(make_rig(moving_object=False), data_dir=str(tmp_path))
+    runtime, rig = make_sim_runtime(data_dir=str(tmp_path))
     return CapabilityRegistry(runtime), runtime, rig
 
 
@@ -34,25 +33,14 @@ def png_b64(image: np.ndarray) -> str:
     return base64.b64encode(buf.tobytes()).decode()
 
 
-def calibrated(registry):
-    results = run_all(registry, [("device.connect", {}), ("calibration.calibrate", {})])
-    assert all(r["ok"] for r in results), results
-    return results
-
-
 # ---------- schemas and error envelope ----------
 
 def test_every_capability_has_schemas_and_a_description(stack):
     registry, _, _ = stack
-    names = registry.names()
-    for expected in [
+    assert registry.names() == [
         "device.connect", "device.disconnect", "device.get_status",
         "project.point", "project.image", "project.clear", "project.status",
-        "camera.capture",
-        "calibration.load", "calibration.calibrate", "calibration.get_mapping", "calibration.map_point",
-        "tracking.start", "tracking.update", "tracking.follow", "tracking.stop",
-    ]:
-        assert expected in names
+    ]
     for cap in registry:
         assert cap.description and cap.input_schema["type"] == "object"
         assert cap.output_schema["required"] == ["ok"]
@@ -63,11 +51,11 @@ def test_errors_are_structured_not_raised(stack):
     registry, _, _ = stack
     for name, args, code in [
         ("nope.nothing", {}, "invalid_argument"),
+        ("camera.capture", {}, "invalid_argument"),
         ("project.point", {"x": "a", "y": 1}, "invalid_argument"),
         ("project.point", {"x": 1, "y": 2, "extra": 1}, "invalid_argument"),
+        ("project.point", {"x": 1, "y": 2, "space": "camera"}, "invalid_argument"),
         ("project.point", {"x": 1, "y": 2}, "not_connected"),
-        ("calibration.get_mapping", {}, "no_calibration"),
-        ("tracking.update", {}, "not_tracking"),
     ]:
         result = call(registry, name, **args)
         assert result["ok"] is False and result["error"]["code"] == code, (name, result)
@@ -82,7 +70,7 @@ def test_connect_reports_identity_and_is_idempotent(stack):
     ])
     assert first["ok"] and first["model"] == "IrisGreen" and first["serial"] == "SIM0001"
     assert second["already_connected"] is True
-    assert status["connected"] and status["camera"] and not status["calibrated"] and not status["tracking"]
+    assert status["connected"] and not status["projecting"]
 
 
 def test_project_point_lights_the_expected_pixel(stack):
@@ -107,27 +95,6 @@ def test_project_point_rejects_outside_the_field(stack):
         assert result["error"]["code"] == "out_of_field", (x, y, result)
 
 
-def test_project_point_in_camera_space_uses_the_calibration(stack):
-    registry, runtime, rig = stack
-    target_cam = rig.world.H @ np.array([400.0, 300.0, 1.0])
-    target_cam = target_cam[:2] / target_cam[2]
-
-    async def go():
-        await registry.call("device.connect", {})
-        cal = await registry.call("calibration.calibrate", {})
-        result = await registry.call(
-            "project.point", {"x": float(target_cam[0]), "y": float(target_cam[1]), "space": "camera"}
-        )
-        far = await registry.call("project.point", {"x": 5.0, "y": 5.0, "space": "camera"})
-        return cal, result, far
-
-    cal, result, far = asyncio.run(go())
-    assert cal["ok"] and result["ok"]
-    assert result["projector"] == pytest.approx([400.0, 300.0], abs=2.0)
-    assert rig.world.lit_camera_centroid() == pytest.approx(tuple(target_cam), abs=3.0)
-    assert far["error"]["code"] == "out_of_field"
-
-
 def test_project_image_fills_the_field_and_validates_input(stack):
     registry, _, rig = stack
     image = np.zeros((120, 160), np.uint8)
@@ -143,27 +110,17 @@ def test_project_image_fills_the_field_and_validates_input(stack):
     ])
     assert results[1]["ok"] and results[1]["lit_pixels"] > 10000
     assert rig.world.mask.shape == (480, 640)
-    assert [r["error"]["code"] for r in results[2:6]] == ["invalid_argument"] * 4
-    assert results[6]["error"]["code"] == "no_calibration"
+    assert [r["error"]["code"] for r in results[2:7]] == ["invalid_argument"] * 5
 
 
-def test_project_image_in_a_camera_region(stack):
-    registry, _, rig = stack
-    image = np.full((100, 200), 255, np.uint8)  # 2:1 white slab
-    calibrated_steps = [
-        ("device.connect", {}),
-        ("calibration.calibrate", {}),
-        ("project.image", {"image_base64": png_b64(image), "region": [420, 260, 720, 460]}),
-    ]
-    _, cal, placed = run_all(registry, calibrated_steps)
-    assert cal["ok"] and placed["ok"], placed
-    cam_quad = Calibration(rig.world.H).proj_to_cam(placed["projector_quad"])
-    assert (cam_quad[:, 0] > 400).all() and (cam_quad[:, 0] < 740).all()
-
-    off = run_all(registry, [
-        ("project.image", {"image_base64": png_b64(image), "region": [5, 5, 60, 60]}),
-    ])[0]
-    assert off["error"]["code"] == "out_of_field"
+def test_project_image_is_pre_mirrored_when_enabled(stack, tmp_path):
+    registry, runtime, rig = stack
+    runtime.mirror_full_field = True
+    image = np.zeros((480, 640), np.uint8)
+    image[:, :100] = 255  # a bar on the left edge
+    cv2.imwrite(str(tmp_path / "bar.png"), image)
+    run_all(registry, [("device.connect", {}), ("project.image", {"image_path": "bar.png"})])
+    assert rig.world.mask[:, -100:].all() and not rig.world.mask[:, :100].any()
 
 
 def test_project_image_path_cannot_escape_the_data_directory(stack, tmp_path):
@@ -202,60 +159,24 @@ def test_disconnect_then_project_fails(stack):
     assert results[1]["ok"] and results[2]["error"]["code"] == "not_connected"
 
 
-# ---------- camera and calibration ----------
+# ---------- rendering ----------
 
-def test_camera_capture_returns_a_decodable_jpeg_with_optional_overlay(stack):
-    registry, _, _ = stack
-    plain = call(registry, "camera.capture", quality=60)
-    assert plain["ok"] and (plain["width"], plain["height"]) == (1280, 720)
-    frame = cv2.imdecode(np.frombuffer(base64.b64decode(plain["image_base64"]), np.uint8), cv2.IMREAD_COLOR)
-    assert frame.shape[:2] == (720, 1280)
-
-    assert call(registry, "camera.capture", overlay_field=True)["error"]["code"] == "no_calibration"
-    calibrated(registry)
-    overlay = call(registry, "camera.capture", overlay_field=True)
-    assert overlay["ok"]
+def test_dot_image_has_one_filled_dot():
+    dot = make_dot_image(100, 50, 5)
+    ys, xs = np.nonzero(dot)
+    assert dot.shape == (480, 640) and abs(xs.mean() - 100) < 0.5 and abs(ys.mean() - 50) < 0.5
 
 
-def test_calibrate_save_load_and_map_point(stack, tmp_path):
-    registry, runtime, rig = stack
-    run_all(registry, [("device.connect", {})])
-    cal = asyncio.run(registry.call("calibration.calibrate", {"save_path": "cal.json"}))
-    assert cal["ok"] and cal["stats"]["err_mean"] < 1.0
-    assert (tmp_path / "cal.json").exists()
+def test_to_1bpp_modes():
+    gray = np.tile(np.arange(256, dtype=np.uint8), (64, 1))
+    assert set(np.unique(to_1bpp(gray, "threshold"))) == {0, 1}
+    assert np.array_equal(to_1bpp(gray, "threshold_inv"), 1 - to_1bpp(gray, "threshold"))
+    otsu = to_1bpp(gray, "otsu")
+    assert 0.3 < otsu.mean() < 0.7
 
-    runtime.calibration = None
-    loaded = call(registry, "calibration.load", path="cal.json")
-    assert loaded["ok"] and np.allclose(loaded["H"], cal["H"])
-
-    mapped = call(registry, "calibration.map_point", x=400, y=300, source="projector")
-    truth = rig.world.H @ np.array([400.0, 300.0, 1.0])
-    assert (mapped["x"], mapped["y"]) == pytest.approx(tuple(truth[:2] / truth[2]), abs=2.0)
-    back = call(registry, "calibration.map_point", x=mapped["x"], y=mapped["y"], source="camera")
-    assert (back["x"], back["y"]) == pytest.approx((400.0, 300.0), abs=1e-3) and back["in_field"]
-
-    assert call(registry, "calibration.load", path="missing.json")["error"]["code"] == "invalid_argument"
-    assert call(registry, "calibration.load", path="../cal.json")["error"]["code"] == "invalid_argument"
-
-
-def test_calibration_failure_is_reported_and_the_light_is_cleared(stack):
-    registry, runtime, rig = stack
-    rig.world.render = lambda: rig.world._wall.copy()  # the camera never sees the projection
-    results = run_all(registry, [("device.connect", {}), ("calibration.calibrate", {})])
-    assert results[1]["error"]["code"] == "calibration_failed"
-    assert runtime.calibration is None and not rig.world.mask.any()
-
-
-def test_calibrating_while_the_scene_moves_fails_instead_of_returning_garbage(tmp_path):
-    runtime, rig = make_sim_runtime(make_rig(moving_object=True), data_dir=str(tmp_path))
-    rig.world.still_when = None  # force the object to keep moving during calibration
-    registry = CapabilityRegistry(runtime)
-    results = run_all(registry, [("device.connect", {}), ("calibration.calibrate", {})])
-    assert results[1]["ok"] is False
-    assert results[1]["error"]["code"] == "calibration_failed"
-    assert runtime.calibration is None
-
-
-def test_calibrate_needs_a_connected_device(stack):
-    registry, _, _ = stack
-    assert call(registry, "calibration.calibrate")["error"]["code"] == "not_connected"
+    small = np.full((24, 24), 128, np.uint8)
+    # A flat mid-grey halftones to roughly its brightness, unlike a hard threshold.
+    assert 0.2 < to_1bpp(small, "dither_flat").mean() < 0.8
+    assert to_1bpp(np.zeros((40, 40), np.uint8), "edges").sum() == 0
+    with pytest.raises(ValueError):
+        to_1bpp(gray, "nope")

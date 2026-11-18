@@ -1,8 +1,8 @@
 """IrisGreen MCP server: exposes the capability set to AI agents as MCP tools.
 
-The server is only the agent-facing interface. BLE, calibration and tracking
-live in the capability SDK; the process running this server must itself have
-access to a BLE adapter (MCP does not get around OS Bluetooth permissions).
+The server is only the agent-facing interface. BLE and projection live in the
+capability SDK; the process running this server must itself have access to a
+BLE adapter (MCP does not get around OS Bluetooth permissions).
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ INSTRUCTIONS = """\
 IrisGreen is a pocket MEMS laser projector. These tools let you put light on a real wall.
 
 Typical flow:
-1. device_connect, then camera_capture to see the wall.
-2. calibration_calibrate once (keep the camera, projector and wall still); it maps camera pixels to projector pixels.
-3. Use camera_capture with overlay_field=true to see the projectable area (orange), pick a target in camera pixels, then project_point (space="camera"), project_image (with region) or tracking_start + tracking_follow.
-4. project_clear turns the light off. Always clear before disconnecting.
+1. device_connect (pass address when more than one projector is in range).
+2. project_image to show a picture filling the projector field, or project_point to show a dot at a projector pixel (640x480, origin top-left).
+3. project_status reports whether light is on. project_clear turns the light off. Always clear before disconnecting.
 
+There is no camera: you cannot see the wall, so positions are in projector pixels.
 Every result has ok=true, or ok=false with error.code and error.message. The projector emits at most what its firmware allows; the tools only validate coordinates.
 """
 
@@ -70,22 +70,10 @@ def build_tools(registry: CapabilityRegistry) -> list[types.Tool]:
 
 
 def to_call_result(result: dict[str, Any]) -> types.CallToolResult:
-    """Turn a capability result into MCP content.
-
-    An embedded JPEG is sent as image content (so the agent can see it) rather
-    than as a huge base64 string inside the JSON text.
-    """
-    payload = dict(result)
-    content: list[types.TextContent | types.ImageContent] = []
-    image = payload.pop("image_base64", None)
-    content.append(types.TextContent(type="text", text=json.dumps(payload, ensure_ascii=False)))
-    if image is not None:
-        content.append(types.ImageContent(
-            type="image", data=image, mime_type=payload.get("mime_type", "image/jpeg")
-        ))
+    """Turn a capability result into MCP content: JSON text plus structured content."""
     return types.CallToolResult(
-        content=content,
-        structured_content=payload,
+        content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))],
+        structured_content=result,
         is_error=not result.get("ok", False),
     )
 
@@ -118,21 +106,12 @@ def build_server(runtime: Runtime) -> Server:
 
 def make_runtime(args: argparse.Namespace) -> Runtime:
     if args.simulate:
-        from irisgreen_capability.sim import make_rig, make_sim_runtime
+        from irisgreen_capability.sim import make_sim_runtime
 
-        runtime, _ = make_sim_runtime(make_rig(moving_object=True), data_dir=args.data_dir, fast=True)
+        runtime, _ = make_sim_runtime(data_dir=args.data_dir, fast=True)
         return runtime
 
-    camera = None
-    if args.hik is not None:
-        from irisgreen_capability import HikCamera
-
-        camera = HikCamera(args.hik or None, exposure_us=args.exposure_us)
-    elif args.camera is not None:
-        from irisgreen_capability import OpenCvCamera
-
-        camera = OpenCvCamera(args.camera)
-    return Runtime(camera=camera, data_dir=args.data_dir)
+    return Runtime(data_dir=args.data_dir, mirror_full_field=not args.no_pre_mirror)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -140,15 +119,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         prog="irisgreen-mcp", description="IrisGreen MCP server (stdio)"
     )
     parser.add_argument("--simulate", action="store_true",
-                        help="use a simulated projector, camera and wall (no hardware)")
-    parser.add_argument("--camera", type=int, default=None,
-                        help="OpenCV camera index; omit for no camera")
-    parser.add_argument("--hik", nargs="?", const="", default=None, metavar="SERIAL",
-                        help="use a Hikrobot camera through the MVS SDK (optionally by serial number)")
-    parser.add_argument("--exposure-us", type=float, default=None,
-                        help="manual exposure for the Hik camera, in microseconds")
+                        help="use a simulated projector (no hardware)")
+    parser.add_argument("--no-pre-mirror", action="store_true",
+                        help="do not mirror full-field images (use when the device's mirror setting is 1)")
     parser.add_argument("--data-dir", default="irisgreen_data",
-                        help="directory for calibration files and input images")
+                        help="directory for input images; agent-supplied paths cannot leave it")
     return parser.parse_args(argv)
 
 

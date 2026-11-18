@@ -1,17 +1,13 @@
 [project]
 name = "irisgreen-capability"
 version = "0.3.0"
-description = "IrisGreen Capability SDK: projection, camera, calibration and tracking capabilities"
+description = "IrisGreen Capability SDK: device and projection capabilities"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
     "opencv-python>=4.9",
     "jsonschema>=4",
     "irisgreen-ble",
-    "irisgreen-mapping",
-    "irisgreen-detection",
-    "irisgreen-calibration",
-    "irisgreen-tracking",
 ]
 
 [build-system]

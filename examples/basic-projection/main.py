@@ -14,7 +14,7 @@ from _common import add_arguments, check, connect_args, make_runtime  # noqa: E4
 
 
 async def main(args: argparse.Namespace) -> None:
-    registry, _ = make_runtime(args, with_camera=False)
+    registry, _ = make_runtime(args)
     try:
         info = check(await registry.call("device.connect", connect_args(args)), "device.connect")
         print(f"    {info['model']} {info['serial']} fw {info['firmware']} mtu {info['mtu']}")

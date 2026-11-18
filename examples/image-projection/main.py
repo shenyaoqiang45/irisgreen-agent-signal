@@ -1,7 +1,4 @@
-"""Image projection: draw a picture, project it full-field, then fit it onto a wall region.
-
-The region step needs a calibration (it uses the camera), so it asks the camera
-to see the projection field first.
+"""Image projection: draw a picture and project it full-field in two conversion modes.
 
     python examples/image-projection/main.py --simulate
 """
@@ -31,26 +28,17 @@ def draw_picture() -> str:
 
 
 async def main(args: argparse.Namespace) -> None:
-    registry, rig = make_runtime(args, with_camera=True)
+    registry, _ = make_runtime(args)
     picture = draw_picture()
     try:
         check(await registry.call("device.connect", connect_args(args)), "device.connect")
-
-        full = check(await registry.call("project.image", {"image_base64": picture, "seconds": 30}),
-                     "project.image (full field)")
-        print(f"    {full['lit_pixels']} lit pixels")
-        await asyncio.sleep(0 if args.simulate else 3.0)
-
-        check(await registry.call("calibration.calibrate", {}), "calibration.calibrate")
-        # Fit the picture inside this rectangle of the camera view.
-        region = [420, 260, 720, 460]
-        placed = check(
-            await registry.call("project.image",
-                                {"image_base64": picture, "region": region, "seconds": 30}),
-            f"project.image (camera region {region})",
-        )
-        print(f"    projector quad {placed['projector_quad']}")
-        await asyncio.sleep(0 if args.simulate else 3.0)
+        for mode in ("threshold", "edges"):
+            shown = check(
+                await registry.call("project.image", {"image_base64": picture, "mode": mode, "seconds": 30}),
+                f"project.image (mode {mode})",
+            )
+            print(f"    {shown['lit_pixels']} lit pixels")
+            await asyncio.sleep(0 if args.simulate else 3.0)
     finally:
         await registry.call("project.clear", {})
         await registry.call("device.disconnect", {})

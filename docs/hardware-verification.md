@@ -4,31 +4,58 @@ Everything above the BLE layer is tested against a simulator. This checklist is 
 
 Legend: **V0.x** is the roadmap version the item accepts.
 
+## Phase 1 (do this first): a PC agent projects an image through MCP
+
+The only goal for now. No camera, calibration, tracking or phones: the camera pipeline was removed ([ADR 0001](adr/0001-remove-camera-pipeline.md)). Everything else below is deferred until this is solid.
+
+Path under test: MCP client (the agent) → `irisgreen_mcp` over stdio → capability SDK → BLE → projector.
+
+Run (change the address to your device; it is required when several are in range):
+
+```text
+python protocol/python/bleak/verify_mcp_image.py --address 20:6E:F1:81:71:62 --seconds 10
+python protocol/python/bleak/verify_mcp_image.py --simulate    # same flow, no hardware
+```
+
+[verify_mcp_image.py](../protocol/python/bleak/verify_mcp_image.py) starts the server, then calls `device_connect`, `project_image` (a generated 640x480 test image with a frame, the text `IRIS`, an arrow and a top-left dot), `project_status`, waits, then `project_clear` and `device_disconnect`. The light is cleared even if a step fails.
+
+- [x] Server starts on hardware without `--simulate` and lists its tools with underscore names (16 tools on 2026-11-18, before the camera tools were removed; 7 now)
+- [x] `device_connect` finds the device by address; `project_image` returns `ok` (31100 lit pixels); `project_status` reports projecting; `project_clear` and `device_disconnect` succeed (2026-11-18, `Iris-G-817162`, Windows, scripted MCP client)
+- [x] The image is visibly on the wall (checked by eye, 2026-11-18). With the device's mirror at 0 it appeared horizontally mirrored (`IRIS` backwards, marker on the right); an image pre-mirrored by the test script appeared correct
+- [x] Fix implemented: the MCP server mirrors full-field `project_image` content on hardware (`--no-pre-mirror` turns it off for a device set to mirror 1). Covered by a simulator test
+- [ ] Confirm by eye that the unmodified test image, projected through the fixed server, now reads correctly (the run passed; the wall result is not yet confirmed)
+- [ ] `project_point` in projector space is not mirrored: x is the projector's own coordinate, so a dot at x=100 appears at the right. Decide whether that is acceptable
+- [ ] The same three calls work from a real agent in a real MCP client (VS Code / Copilot, using the config in the [MCP README](../mcp/irisgreen-mcp-server/README.md#client-configuration)), launched by the client, not from a terminal
+- [ ] `project_image` with `image_path` outside `--data-dir` is refused
+
+Fix found on the way: the `project_image` output schema said `projector_quad` is an array, but it is `null` without a region, so strict MCP clients rejected the result. The field was removed with the camera pipeline; a test still covers a full-field image through the client.
+
+Pass when a real agent, given only "project this image", makes the light appear on the wall and turns it off afterwards.
+
 ## PC results so far (2026-11-18)
 
-Rig: Windows PC with a BLE adapter, `Iris-G-817162` (`20:6E:F1:81:71:62`, firmware `36130326071700`), Hikrobot MV-CA013-A0UM camera (USB3, mono, 1280x1024) on the MVS SDK. Tools: [verify_pc.py](../protocol/python/bleak/verify_pc.py) (read-only) and [verify_transfer.py](../protocol/python/bleak/verify_transfer.py) (changes the group-1 slot).
+Rig: Windows PC with a BLE adapter, `Iris-G-817162` (`20:6E:F1:81:71:62`, firmware `36130326071700`), and at the time a Hikrobot MV-CA013-A0UM camera (USB3, mono, 1280x1024) on the MVS SDK, since removed ([ADR 0001](adr/0001-remove-camera-pipeline.md)). Tools: [verify_pc.py](../protocol/python/bleak/verify_pc.py) (read-only) and `verify_transfer.py` (camera based, changes the group-1 slot; now only on branch `archive/camera-pipeline`).
 
 | Area | Result |
 |---|---|
 | V0.1 GATT (PC) | **Pass.** All services and characteristics match the spec with the documented properties; MTU 512; firmware and manufacturer readable; status frames match the 8-byte shape. `B6B7CA` (firmware `36130326032001`) passes the same checks read-only. |
 | Command round trips | **Pass.** Response prefix is `0x80`. Brightness, flip and keystone mode write and read back correctly; keystone angle, FOV and mirror are acknowledged and readable. Round trip about 160-220 ms. |
 | Image transfer | **Pass.** 38462-byte stream in about 4.0 s (9.5 KiB/s at MTU 512). **50 of 50** consecutive uploads succeeded (mean 4.14 s) and the projection was still correct afterwards. |
-| Orientation | **Finding.** With mirror 0 (the default) the camera sees the projection **horizontally mirrored**: not vertically flipped, but a solid square authored top-left appears top-right and text reads backwards. With mirror 1 it matches the authored image. The pixel packing is unchanged and correct; calibration absorbs the mirroring, but full-field images and text need mirror 1 (or pre-mirrored content). |
+| Orientation | **Finding.** With mirror 0 (the default) the camera sees the projection **horizontally mirrored**: not vertically flipped, but a solid square authored top-left appears top-right and text reads backwards. With mirror 1 it matches the authored image. The pixel packing is unchanged and correct; calibration absorbs the mirroring, but full-field images and text need mirror 1 (or pre-mirrored content). Seen by eye too (2026-11-18): `IRIS` backwards through MCP. The MCP server now pre-mirrors full-field `project_image` content by default. |
 | Identity | **Finding.** This unit's Model and Serial characteristics and the SN / model / name commands return empty (never provisioned). The battery characteristic reads `0x64` = 100, which looks like a percentage. |
-| Camera | **Finding.** Opening a DirectShow camera before BLE breaks Bleak ("Thread is configured for Windows GUI"). Cameras now open lazily on a worker thread. The Hik camera works through `HikCamera`. |
+| Camera | **Finding (historical).** Opening a DirectShow camera before BLE breaks Bleak ("Thread is configured for Windows GUI"). The camera code is gone; if it comes back, open the camera lazily on a worker thread, after BLE. |
 
 Settings are restored after each test (brightness 80, flip 0, keystone mode 0 and angle 0, mirror 0, FOV 2). FOV 2 (20x10) is the unit's original level, inferred from its projection footprint before any change, since it was not read first.
 
-Still to do on PC: calibration, projection, tracking and the MCP server on real hardware (sections 3-7), reconnect and interrupted-transfer behaviour, minimum safe pacing, and the Android and iOS runs.
+Still to do on PC (after Phase 1): the rest of sections 3-4 on real hardware, reconnect and interrupted-transfer behaviour, minimum safe pacing, and the Android and iOS runs.
 
 ## 0. Test setup
 
 - [x] IrisGreen charged, firmware version recorded (`36130326071700`)
 - [ ] Test wall: flat, matte, 1.5-3 m from the projector, dim room (pegboard wall, dim room; distance not measured)
-- [x] Camera on a fixed mount seeing the projection area (Hik MV-CA013-A0UM); exposure 60 ms used for the tests
-- [ ] Camera, projector and wall do not move during calibration
+- [ ] Projector and wall do not move during a test
 - [ ] Devices on hand: one Windows/Linux PC with a BLE adapter, one Android phone (note OS version), one iPhone (note iOS version): PC only so far
-- [x] `python -m pytest` and `flutter test` pass on the machine being used (115 and 37)
+- [x] `python -m pytest` and `flutter test` pass on the machine being used (60 Python tests after the camera removal; 37 Dart tests earlier)
 
 ## 1. V0.1 GATT Profile: connect and discover
 
@@ -66,9 +93,9 @@ Goal: images and commands transfer reliably on every platform.
 
 **Commands (each platform)**
 - [x] Read brightness, picture count (PC; picture count 37 on `B6B7CA`)
-- [x] Set brightness (0, 50, 100) and read it back (PC); visible effect not yet checked by camera
+- [x] Set brightness (0, 50, 100) and read it back (PC); visible effect not yet checked
 - [ ] Keystone mode 0-3 verified by read-back (PC); keystone angle -10, 0, 10 acknowledged but the effect and the full -70..70 range are not checked
-- [ ] FOV levels 0-2 acknowledged and measured through the camera (levels 0 and 1 project a much smaller footprint than 2); mirror and flip read back; flip effect not checked visually (PC)
+- [ ] FOV levels 0-2 acknowledged and measured by eye (levels 0 and 1 project a much smaller footprint than 2); mirror and flip read back; flip effect not checked visually (PC)
 - [ ] Play a built-in material group, stop, delete a group: custom group 1 play and stop only; delete not tested
 - [x] Confirm the documented response prefix (`80`, or `08`) the device really sends; it is `80` (PC)
 - [ ] Confirm status frames never get mistaken for responses under load
@@ -90,66 +117,31 @@ Goal: images and commands transfer reliably on every platform.
 - [ ] `device.connect` with no address finds the only device; with two devices it asks for an address
 - [ ] `project.point` in projector space: corners and centre land where expected
 - [ ] `project.image` with each mode (`threshold`, `otsu`, `dither`, `edges`): real brightness and legibility, record which mode suits which content
-- [ ] `project.clear` really emits no light (check with the camera and by eye)
+- [ ] `project.clear` really emits no light (check by eye)
 - [ ] One-hour playback cap and `seconds` handling match device behaviour
-- [ ] Measure real upload latency per frame (feeds tracking lead); record the number
+- [ ] Measure real upload latency per frame; record the number
 - [ ] `device.disconnect` leaves playback running as documented
 - [ ] Battery drain during a 10-minute continuous projection
 
-## 4. Camera and calibration
+## 4. V0.4 MCP server with a real agent
 
-- [x] `HikCamera` opens the Hik MV-CA013-A0UM on Windows (1280x1024, mono) once the MVS SDK is installed; `OpenCvCamera` is for UVC cameras only. Frame latency and flush count not tuned
-- [ ] `camera.capture` shows a sharp frame; `overlay_field` outlines the real projectable area after calibration
-- [ ] `detect_dot` finds the real laser dot: record threshold, exposure and room light that work; try a bright room and a dim room
-- [ ] Saturated (white) dot centre still detected
-- [ ] `calibration.calibrate` succeeds; record `err_mean`, `err_max`, inliers (target: mean under 3 px at the camera's resolution)
-- [ ] `verify` on five fresh points: errors are small and consistent
-- [ ] Calibration is rejected when someone walks through the view or the camera is bumped
-- [ ] Failure message is useful when the dot is invisible (camera exposure) 
-- [ ] Calibration repeatability: run three times, compare the homographies
-- [ ] Different wall angle and distance; confirm the planar assumption holds
-
-## 5. V0.4 MCP server with a real agent
-
-- [ ] `python -m irisgreen_mcp --hik` (or `--camera 0` for a UVC camera) starts without `--simulate`
-- [ ] Connect it to at least two MCP clients (for example VS Code / Copilot and Claude Desktop); tools list with the underscore names
-- [ ] An agent completes: connect, capture, calibrate, project a point, clear
-- [ ] `camera_capture` image content is actually visible to the model
-- [ ] Error results (`isError`) lead the agent to the correct recovery (for example `no_calibration` leads to calibrating)
+- [ ] `python -m irisgreen_mcp` starts without `--simulate`. Done so far: it starts and serves on hardware (2026-11-18, see Phase 1); launched from a terminal-started script, not by a client application
+- [ ] Connect it to at least two MCP clients (for example VS Code / Copilot and Claude Desktop); tools list with the underscore names. Done so far: one scripted client (`mcp` Python client) lists the tools; no real client yet
+- [ ] An agent completes: connect, project an image, project a point, clear. Done so far: connect, project an image, status, clear, disconnect from a scripted client (not an agent)
+- [ ] Error results (`isError`) lead the agent to the correct recovery (for example `not_connected` leads to `device_connect`; several devices in range leads to passing an address)
 - [ ] BLE permissions work when the server is launched by the client application, not only from a terminal
-- [ ] Server shutdown (client closes) disconnects BLE and releases the camera
+- [ ] Server shutdown (client closes) disconnects BLE
 - [ ] Path restriction: an agent asking for a path outside `--data-dir` is refused
 
-## 6. V0.5 Algorithms on real data
-
-- [ ] `TemplateMeasurer` follows a real object at walking speed under the projected dot; record the aim error with the dot on the object (expect a few pixels of pull)
-- [ ] Try a stronger `Measurer` if the error is too large, and compare
-- [ ] Kalman tuning: `meas_std`, `accel_std`, `max_lost` against real motion
-- [ ] Lead: measured upload latency vs `max_lead_s` and `max_lead_px`; check there is no overshoot at turn-arounds
-- [ ] `RegionTracker` on a textured poster: lost-tracking behaviour is clean
-- [ ] `refine_outline` (GrabCut) on real photos of the target
-- [ ] `render_camera_polygon` and `place_in_camera_rect` land on the intended wall region
-
-## 7. V1.0 end-to-end vision-to-projection
-
-- [ ] Real VLM (Qwen3-VL, Kimi or another) via `openai_compatible_grounder`: grounding returns usable boxes on real wall photos
-- [ ] Orange overlay in the prompt actually keeps targets inside the projectable area
-- [ ] `examples/object-tracking/main.py --intent "..."` on three different targets
-- [ ] A moving target is followed for 60 seconds; record the success rate and the failure causes
-- [ ] Failure stages (`ground`, `track`, `follow`) are reported correctly on real failures
-- [ ] An agent completes the task with no human input, from only the instruction
-
-**Acceptance (V1.0):** an AI agent finishes a vision-to-physical-projection task by itself, repeatably.
-
-## 8. Safety and robustness
+## 5. Safety and robustness
 
 - [ ] Laser power and mechanical limits are enforced by firmware regardless of what the SDK sends (try out-of-range brightness and keystone values at the protocol level)
 - [ ] Nothing in the SDK lets a client exceed the device's own limits
 - [ ] No light is left on after a crash: kill the process mid-projection and confirm behaviour; consider a watchdog or documented `project.clear` practice
 - [ ] Eye-safety note and a stop procedure written down before untrained users try it
-- [ ] Out-of-field targets never project outside the calibrated area
+- [ ] Points and images never project outside the projector field
 
-## 9. Record and close the loop
+## 6. Record and close the loop
 
 For each failure found:
 
@@ -160,8 +152,6 @@ For each failure found:
 | Version | Verified on | Date | Notes |
 |---|---|---|---|
 | V0.1 | PC (Bleak, Windows), `Iris-G-817162` fw 36130326071700. Android and iOS pending | 2026-11-18 | PC passes. Model and serial are empty on this unit |
-| V0.2 | PC (Bleak, Windows), same unit, Hik camera. Android and iOS pending | 2026-11-18 | PC passes: 50 of 50 uploads. Mirror 0 shows the image mirrored |
+| V0.2 | PC (Bleak, Windows), same unit. Android and iOS pending | 2026-11-18 | PC passes: 50 of 50 uploads. Mirror 0 shows the image mirrored |
 | V0.3 | | | |
 | V0.4 | | | |
-| V0.5 | | | |
-| V1.0 | | | |

@@ -1,4 +1,4 @@
-"""Gray image -> 1bpp conversion for the laser projector.
+"""Turn content into the 640x480 1bpp masks the projector shows.
 
 The device shows binary pixels only, so how an image is binarized is an
 artistic and perceptual choice, kept here and out of the protocol layer.
@@ -8,6 +8,26 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
+
+PROJ_WIDTH = 640
+PROJ_HEIGHT = 480
+
+
+def in_projection_field(points, margin: float = 0.0) -> bool:
+    """True if every projector-space point lies inside the 640x480 field."""
+    pts = np.asarray(points, dtype=np.float64).reshape(-1, 2)
+    return bool(
+        np.isfinite(pts).all()
+        and (pts[:, 0] >= margin).all() and (pts[:, 0] <= PROJ_WIDTH - 1 - margin).all()
+        and (pts[:, 1] >= margin).all() and (pts[:, 1] <= PROJ_HEIGHT - 1 - margin).all()
+    )
+
+
+def make_dot_image(x: float, y: float, radius: int = 12) -> np.ndarray:
+    """640x480 1bpp image with a single filled dot at (x, y)."""
+    img = np.zeros((PROJ_HEIGHT, PROJ_WIDTH), dtype=np.uint8)
+    cv2.circle(img, (int(round(x)), int(round(y))), radius, 1, -1)
+    return img
 
 
 def binarize(gray: np.ndarray, threshold: int = 127) -> np.ndarray:

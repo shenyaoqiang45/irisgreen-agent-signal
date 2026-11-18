@@ -125,21 +125,9 @@ Initial capabilities:
 - device.disconnect()
 - device.get_status()
 
-**Spatial Calibration**
-- calibration.load()
-- calibration.calibrate()
-- calibration.get_mapping()
-
-**Tracking**
-- tracking.start()
-- tracking.update()
-- tracking.stop()
+Camera, calibration and tracking capabilities were removed for now; see [ADR 0001](docs/adr/0001-remove-camera-pipeline.md).
 
 The Capability SDK translates high-level operations into BLE Protocol SDK commands.
-
-Calibration and coordinate mapping are foundational services.
-
-Tracking algorithms should be modular and replaceable rather than hardcoded into the communication layer.
 
 ### Layer 4 — MCP Server / Agent Tools
 
@@ -328,28 +316,27 @@ AI-native physical interaction.**
 |---|---|---|---|
 | V0.1 | IrisGreen GATT Profile | PC, Android and iOS can connect | Specified and implemented ([docs](docs/gatt-profile.md)). **Verified on PC** with a real IrisGreen; Android and iOS not yet verified |
 | V0.2 | BLE Protocol SDK | Images and commands transfer across platforms | Python and Flutter SDKs agree on shared golden vectors. **Verified on PC**: commands, and 50 of 50 image uploads on a real device; Android and iOS not yet verified |
-| V0.3 | Capability SDK | Unified projection, camera and status interfaces | Implemented ([spec](docs/capability-spec.md)), tested against the simulator |
-| V0.4 | MCP Server | An AI Agent can call the device | Implemented, 16 tools, tested over in-memory and stdio MCP |
-| V0.5 | Reference Algorithms | Reference tracking, calibration and mapping | Implemented ([algorithms](algorithms)) |
-| V1.0 | AI Physical Interface | An AI Agent completes a vision-to-physical-projection task on its own | The full loop runs end to end in simulation ([`project_on_target`](sdk/capability-sdk/irisgreen_capability/tasks.py)); not yet run on hardware |
+| V0.3 | Capability SDK | Unified projection and status interfaces | Implemented ([spec](docs/capability-spec.md)), tested against the simulator. No camera ([ADR 0001](docs/adr/0001-remove-camera-pipeline.md)) |
+| V0.4 | MCP Server | An AI Agent can call the device | Implemented, 7 tools, tested over in-memory and stdio MCP. A scripted MCP client projected an image on a real device |
+| V0.5 | Reference Algorithms | Reference tracking, calibration and mapping | Removed with the camera pipeline; recoverable from branch `archive/camera-pipeline` |
+| V1.0 | AI Physical Interface | An AI Agent completes a vision-to-physical-projection task on its own | Deferred until a camera is reintroduced |
 
-Everything above the BLE layer is verified against a simulator that speaks the real protocol. Verification on real hardware (and a real camera and vision model) is the remaining acceptance work, tracked in the [hardware verification to-do list](docs/hardware-verification.md).
+Everything above the BLE layer is verified against a simulator that speaks the real protocol. Verification on real hardware is the remaining acceptance work, tracked in the [hardware verification to-do list](docs/hardware-verification.md).
 
 ## 8. Repository Layout
 
 ```text
-docs/                         architecture, GATT profile, protocol and capability specs
+docs/                         architecture, GATT profile, protocol and capability specs, ADRs
 protocol/
   gatt/specification/         machine-readable GATT profile (V0.1)
-  python/bleak/               PC transport (Python + Bleak)
+  python/bleak/               PC transport (Python + Bleak) and hardware check scripts
   flutter/ble/                Android and iOS SDK and transport (Dart)
 sdk/
   ble-protocol-sdk/           commands, image packing, IrisClient (V0.2)
-  capability-sdk/             capabilities, runtime, simulator, vision task (V0.3)
+  capability-sdk/             capabilities, runtime, rendering, simulator (V0.3)
 mcp/irisgreen-mcp-server/     MCP server (V0.4)
-algorithms/                   calibration, coordinate-mapping, detection, tracking (V0.5)
-examples/                     basic-projection, image-projection, object-tracking
-tests/                        protocol, cross-platform, algorithms, capability, mcp, integration
+examples/                     basic-projection, image-projection
+tests/                        protocol, cross-platform, capability, mcp
 ```
 
 ## 9. Quick Start
@@ -361,7 +348,7 @@ pip install -r requirements.txt
 python -m pytest                                      # Python tests (simulated hardware)
 cd protocol/flutter/ble && flutter test               # Dart tests
 
-python examples/object-tracking/main.py --simulate    # the whole loop, no hardware
+python examples/image-projection/main.py --simulate   # project pictures, no hardware
 python examples/basic-projection/main.py --address <BLE address>
 ```
 

@@ -1,21 +1,21 @@
 import asyncio
-import base64
 import json
 import os
 import sys
 from pathlib import Path
 
-import pytest
+import cv2
+import numpy as np
 from mcp import Client, StdioServerParameters
 
-from irisgreen_capability.sim import make_rig, make_sim_runtime
+from irisgreen_capability.sim import make_sim_runtime
 from irisgreen_mcp import build_server, tool_name
 
 ROOT = Path(__file__).parents[2]
 
 
 def sim_server(tmp_path):
-    runtime, rig = make_sim_runtime(make_rig(moving_object=True), data_dir=str(tmp_path))
+    runtime, rig = make_sim_runtime(data_dir=str(tmp_path))
     return build_server(runtime), runtime, rig
 
 
@@ -37,14 +37,15 @@ def test_lists_every_capability_with_schemas(tmp_path):
 
     listing, instructions = asyncio.run(go())
     names = {t.name for t in listing.tools}
-    assert {"device_connect", "project_point", "project_image", "project_clear", "camera_capture",
-            "calibration_calibrate", "tracking_follow", "tracking_stop"} <= names
-    assert len(names) == 16
+    assert names == {
+        "device_connect", "device_disconnect", "device_get_status",
+        "project_point", "project_image", "project_clear", "project_status",
+    }
     assert all(n.replace("_", "").isalnum() for n in names)  # every client's name rules
     point = next(t for t in listing.tools if t.name == "project_point")
     assert point.input_schema["required"] == ["x", "y"]
     assert point.output_schema["oneOf"][1]["properties"]["ok"] == {"const": False}
-    assert "calibration_calibrate" in instructions
+    assert "project_image" in instructions
 
 
 def test_errors_are_flagged_and_structured(tmp_path):
@@ -64,38 +65,31 @@ def test_errors_are_flagged_and_structured(tmp_path):
     assert json.loads(not_connected.content[0].text)["ok"] is False
 
 
-def test_agent_flow_connect_calibrate_see_project_track(tmp_path):
-    server, runtime, rig = sim_server(tmp_path)
-    o = rig.world.objects[0]
-    bbox = [o.x, o.y, o.width, o.height]
+def test_agent_flow_connect_project_image_and_clear(tmp_path):
+    server, _, rig = sim_server(tmp_path)
+    image = np.zeros((480, 640), np.uint8)
+    cv2.rectangle(image, (50, 50), (300, 200), 255, -1)
+    cv2.imwrite(str(tmp_path / "a.png"), image)
 
     async def go():
         async with Client(server) as client:
             call = client.call_tool
             connected = await call("device_connect", {})
-            calibrated = await call("calibration_calibrate", {"save_path": "wall.json"})
-            seen = await call("camera_capture", {"overlay_field": True, "quality": 50})
+            shown = await call("project_image", {"image_path": "a.png"})
+            lit = rig.world.mask.copy()
+            status = await call("project_status", {})
             dot = await call("project_point", {"x": 320, "y": 240})
-            started = await call("tracking_start", {"bbox": bbox})
-            followed = await call("tracking_follow", {"duration_s": 2, "max_frames": 30})
             cleared = await call("project_clear", {})
-            return connected, calibrated, seen, dot, started, followed, cleared
+            return connected, shown, lit, status, dot, cleared
 
-    connected, calibrated, seen, dot, started, followed, cleared = asyncio.run(go())
-    for step in (connected, calibrated, seen, dot, started, followed, cleared):
+    connected, shown, lit, status, dot, cleared = asyncio.run(go())
+    for step in (connected, shown, status, dot, cleared):
         assert not step.is_error, step.content
     assert structured(connected)["model"] == "IrisGreen"
-    assert structured(calibrated)["stats"]["err_mean"] < 1.0
-    assert (tmp_path / "wall.json").exists()
-
-    # the camera frame reaches the agent as an image, not as base64 text
-    assert [c.type for c in seen.content] == ["text", "image"]
-    assert seen.content[1].mime_type == "image/jpeg"
-    assert base64.b64decode(seen.content[1].data)[:2] == b"\xff\xd8"
-    assert "image_base64" not in structured(seen)
-
-    assert structured(followed)["aimed_frames"] >= 15
-    assert not rig.world.mask.any()  # cleared
+    # strict clients validate the result against the output schema, so null/extra fields matter
+    assert structured(shown)["lit_pixels"] > 0 and lit.any()
+    assert structured(status)["projecting"] is True
+    assert not rig.world.mask.any()
 
 
 def test_stdio_entry_point_serves_the_simulator(tmp_path):
@@ -103,8 +97,7 @@ def test_stdio_entry_point_serves_the_simulator(tmp_path):
     env["PYTHONPATH"] = os.pathsep.join(
         str(ROOT / p) for p in [
             "sdk/ble-protocol-sdk", "sdk/capability-sdk", "protocol/python/bleak",
-            "algorithms/calibration", "algorithms/coordinate-mapping",
-            "algorithms/detection", "algorithms/tracking", "mcp/irisgreen-mcp-server",
+            "mcp/irisgreen-mcp-server",
         ]
     )
     params = StdioServerParameters(
@@ -121,5 +114,5 @@ def test_stdio_entry_point_serves_the_simulator(tmp_path):
             return len(tools.tools), connected, status
 
     count, connected, status = asyncio.run(asyncio.wait_for(go(), 60))
-    assert count == 16
+    assert count == 7
     assert not connected.is_error and structured(status)["connected"] is True

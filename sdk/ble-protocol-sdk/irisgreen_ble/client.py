@@ -1,4 +1,4 @@
-"""IrisGreen BLE Protocol SDK client (V0.2): commands and image transfer over a Transport."""
+﻿"""IrisGreen BLE Protocol SDK client (V0.2): commands and image transfer over a Transport."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from .transport import Transport
 
 WRITE_TIMEOUT = 15.0
 DEFAULT_ATT_MTU = 23
-START_DELAY_S = 0.1
-PACKET_DELAY_S = 0.03
+START_DELAY_S = 0.05
+PACKET_DELAY_S = 0.005
 
 
 @dataclass
