@@ -41,7 +41,7 @@ All three launch the same command, so the same tools appear:
 }
 ```
 
-Claude Desktop, Kimi Work and other clients take the same `command` / `args` under `mcpServers` (or their own equivalent key) in their config file; only VS Code and Cursor have been run on a real device so far.
+Claude Desktop, Kimi Work and other clients take the same `command` / `args` under `mcpServers` (or their own equivalent key) in their config file. VS Code, Cursor, WorkBuddy and Kimi Work have been run on a real device; Codex has not.
 
 Codex takes the same command in `~/.codex/config.toml`:
 

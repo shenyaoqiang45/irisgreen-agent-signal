@@ -20,8 +20,8 @@ IrisGreen now speaks **MCP (Model Context Protocol)**. Point your AI coding or w
 |---|---|
 | **Cursor** | Verified: an agent projected through MCP tools on a real projector |
 | **VS Code Copilot** (agent mode) | Verified: an agent projected through MCP tools on a real projector |
-| **WorkBuddy** | Config included ([.mcp.json](.mcp.json)); real-device run still to do |
-| **Kimi Work** | Standard stdio MCP server, same command; not yet run |
+| **WorkBuddy** | Verified by the maintainer; config included ([.mcp.json](.mcp.json)) |
+| **Kimi Work** | Verified by the maintainer; standard stdio MCP server, same command |
 | **Codex** | Standard stdio MCP server, same command; not yet run |
 
 Eight tools: connect and disconnect, show a single image, loop a 1-10 frame animation, show a dot, clear, and check status. No SDK to learn and no Bluetooth code to write.
