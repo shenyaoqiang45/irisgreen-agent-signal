@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">IrisGreen AI physical interface architecture</title>
+  <desc id="desc">AI agents call IrisGreen MCP tools, which use the Capability SDK, BLE Protocol SDK, and GATT to control a physical IrisGreen projector.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#081321"/>
+      <stop offset="1" stop-color="#111e2d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#64d887"/>
+      <stop offset="1" stop-color="#b5f27a"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#80df98"/>
+    </marker>
+    <style>
+      .label { font: 600 18px system-ui, sans-serif; fill: #eef5f7; }
+      .small { font: 14px system-ui, sans-serif; fill: #a9bac8; }
+      .eyebrow { font: 600 12px system-ui, sans-serif; letter-spacing: 2px; fill: #80df98; }
+      .box { fill: #142438; stroke: #31455a; stroke-width: 1.5; }
+    </style>
+  </defs>
+  <rect width="1200" height="420" rx="24" fill="url(#bg)"/>
+  <text x="54" y="52" class="eyebrow">FROM AI TOOL CALL TO PHYSICAL LIGHT</text>
+
+  <g transform="translate(52 112)">
+    <rect class="box" width="204" height="150" rx="16"/>
+    <circle cx="34" cy="36" r="13" fill="#203d50"/>
+    <path d="M27 37h14M34 30v14" stroke="#9be5ad" stroke-width="2" stroke-linecap="round"/>
+    <text x="24" y="82" class="label">AI Agent</text>
+    <text x="24" y="109" class="small">Cursor · Copilot · Kimi</text>
+    <text x="24" y="130" class="small">WorkBuddy · Codex</text>
+  </g>
+  <path d="M266 187H310" stroke="#80df98" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g transform="translate(322 112)">
+    <rect class="box" width="204" height="150" rx="16"/>
+    <text x="24" y="43" class="eyebrow">STANDARD TOOLS</text>
+    <text x="24" y="82" class="label">MCP Server</text>
+    <text x="24" y="109" class="small">project_image</text>
+    <text x="24" y="130" class="small">project_animation · clear</text>
+  </g>
+  <path d="M536 187H580" stroke="#80df98" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g transform="translate(592 112)">
+    <rect class="box" width="204" height="150" rx="16"/>
+    <text x="24" y="43" class="eyebrow">SEMANTIC CONTROL</text>
+    <text x="24" y="82" class="label">Capability SDK</text>
+    <text x="24" y="109" class="small">Images · animation</text>
+    <text x="24" y="130" class="small">Points · device status</text>
+  </g>
+  <path d="M806 187H850" stroke="#80df98" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g transform="translate(862 112)">
+    <rect class="box" width="204" height="150" rx="16"/>
+    <text x="24" y="43" class="eyebrow">BLUETOOTH LE</text>
+    <text x="24" y="82" class="label">BLE SDK + GATT</text>
+    <text x="24" y="109" class="small">Commands &amp; image data</text>
+    <text x="24" y="130" class="small">Standardized device link</text>
+  </g>
+  <path d="M1076 187H1112" stroke="#80df98" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1110 130)" filter="url(#glow)">
+    <rect x="0" y="32" width="54" height="52" rx="13" fill="#253b3c" stroke="#8be49d" stroke-width="2"/>
+    <circle cx="42" cy="58" r="8" fill="#b5f27a"/>
+    <path d="M47 58L80 35V81Z" fill="#9cf0a0" opacity=".16"/>
+  </g>
+  <text x="1092" y="288" class="small">IrisGreen</text>
+  <text x="1088" y="309" class="small">projector</text>
+
+  <path d="M1128 223L1085 358H1180Z" fill="#8fe49c" opacity=".09"/>
+  <path d="M1142 228L1110 342H1168Z" fill="#b5f27a" opacity=".12"/>
+  <text x="54" y="358" class="small">The agent speaks MCP. The local server handles BLE. The projector turns tool calls into light.</text>
+</svg>

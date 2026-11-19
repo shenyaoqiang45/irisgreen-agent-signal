@@ -1,37 +1,64 @@
-# IrisGreen — AI Physical Interface
+# IrisGreen — The Physical Display Interface for AI Phones
 
-**Make AI interact with the physical world.**
+**Give AI a display beyond the screen.**
+
+![Vision concept: an AI phone sending generated visuals to an IrisGreen-style projector for display in a shared physical space](docs/images/ai-phone-physical-display-vision.png)
+
+*AI Phone physical-display vision — a concept illustration, not a product photograph or a claim of native phone integration.*
 
 [**Buy IrisGreen**](https://irisarworld.com/irisgreen/?utm_source=github&utm_medium=readme&utm_campaign=irisgreen-ai-physical-interface)
 
-IrisGreen is an AI Physical Interface that connects AI Agents with physical devices through a standardized, cross-platform hardware capability layer.
+AI phones are becoming more capable at creating and understanding visual content, but their output is still trapped on a small screen. **Our vision is for IrisGreen to become the physical display interface for AI phones**—so an AI can bring images, animations, and shared visual experiences into the room around you.
 
-It provides a unified software interface for AI Agents to interact with IrisGreen hardware, enabling real-world operations such as image projection, object tracking, spatial mapping, and visual interaction.
-
-The goal is to transform IrisGreen from a hardware-controlled projection device into an extensible physical interface for AI applications.
+That direct phone-to-projector experience is the vision, not a shipping integration today. The working foundation is already here: AI agents on supported desktop and work clients call IrisGreen through **MCP**, and a local Bluetooth LE connection turns those calls into projected light. Camera vision and object tracking are not part of the current release.
 
 ---
 
 ## Let your AI agent put light on a wall
 
-IrisGreen now speaks **MCP (Model Context Protocol)**. Point your AI coding or work assistant at one command and say "project this image", "loop these five frames", or "turn the light off". The agent connects to the projector over Bluetooth and does it.
+IrisGreen speaks **MCP (Model Context Protocol)**, so compatible coding and work agents can use the same device tools without custom BLE code.
 
 | Agent | Status |
 |---|---|
 | **Cursor** | Verified: an agent projected through MCP tools on a real projector |
 | **VS Code Copilot** (agent mode) | Verified: an agent projected through MCP tools on a real projector |
-| **WorkBuddy** | Verified by the maintainer; config included ([.mcp.json](.mcp.json)) |
-| **Kimi Work** | Verified by the maintainer; standard stdio MCP server, same command |
-| **Codex** | Standard stdio MCP server, same command; not yet run |
+| **WorkBuddy** | Verified on hardware; config included ([.mcp.json](.mcp.json)) |
+| **Kimi Work** | Verified on hardware |
+| **Codex** | Standard stdio MCP configuration documented; not yet verified |
 
-Eight tools: connect and disconnect, show a single image, loop a 1-10 frame animation, show a dot, clear, and check status. No SDK to learn and no Bluetooth code to write.
+### Give it a physical task
+
+| Ask your agent to… | It can… |
+|---|---|
+| “Project this picture.” | Connect and show a full-field image |
+| “Loop these frames as an animation.” | Upload and play 1–10 frames from group 1 |
+| “Put a dot near the center.” | Project a point in the 640×480 projector field |
+| “Turn the projector light off.” | Clear the projection and report device status |
+
+Eight MCP tools cover connect/disconnect, image and animation projection, point projection, clear, and status. The server returns structured results so the agent can tell whether a tool call succeeded.
+
+**Verification note:** single-image projection has been confirmed with real agent clients on hardware. `project_animation` currently passes simulator tests; it has not yet been verified on a real projector, and the 10-frame group-1 limit still needs hardware confirmation.
+
+### Try it
+
+Install the Python dependencies, then run the built-in simulator—no projector needed:
 
 ```text
+python -m pip install -r requirements.txt
 python mcp/irisgreen-mcp-server/launch.py --simulate   # try it with no hardware
-python mcp/irisgreen-mcp-server/launch.py              # real IrisGreen over Bluetooth
+```
+
+For real hardware, connect over Bluetooth (the host must have a BLE adapter and OS permission):
+
+```text
+python mcp/irisgreen-mcp-server/launch.py --address <BLE address>
 ```
 
 Setup for each client, including Codex (`~/.codex/config.toml`), is in the [MCP server guide](mcp/irisgreen-mcp-server/README.md#client-configuration).
+
+![Illustrative concept: a desktop AI agent controlling an IrisGreen-style projector through MCP](docs/images/irisgreen-mcp-concept.png)
+
+*Current MCP workflow concept, not a photograph of the IrisGreen product.*
 
 ---
 
@@ -65,21 +92,7 @@ The hardware interface should remain stable while AI-generated algorithms and ap
 
 The system is divided into five logical layers.
 
-```text
-                  AI Applications
-                         |
-                  AI Agent / LLM
-                         |
-                 MCP Server / Tools
-                         |
-                  Capability SDK
-                         |
-                 BLE Protocol SDK
-                         |
-                 IrisGreen GATT
-                         |
-                  IrisGreen Device
-```
+![IrisGreen architecture: AI agent to MCP tools to SDKs, GATT, and projector](docs/images/architecture.svg)
 
 ### Layer 1 — IrisGreen GATT Profile
 
@@ -138,10 +151,10 @@ Instead, they interact with semantic APIs.
 Initial capabilities:
 
 **Projection**
-- project.point(x, y)
-- project.image(image)
-- project.clear()
-- project.status()
+- `project.point(x, y)` — show a dot in projector pixels.
+- `project.image(image)` — project a single full-field image.
+- `project.animation(frames)` — store and loop 1–10 frames in group 1.
+- `project.clear()` and `project.status()` — control and inspect projection.
 
 **Device Control**
 - device.connect()
@@ -164,27 +177,15 @@ Responsibilities:
 - Return device status and execution results.
 - Support AI-generated algorithms and dynamic task orchestration.
 
-Example:
-
-An AI Agent receives the instruction:
-
-"Track the selected object and project a green laser point onto it."
-
-The Agent can:
-
-1. Select or generate a suitable tracking algorithm.
-2. Obtain object coordinates.
-3. Apply spatial calibration.
-4. Invoke project.point(x, y).
-5. Monitor execution and update coordinates.
+For example, an agent can take “show these frames as a looping animation” and call `device_connect`, `project_animation`, and `project_status`. The tool validates the request, prepares each image, uploads the frames, and starts playback.
 
 **Important:** MCP is the Agent-facing interface, not the BLE communication implementation.
 
 The MCP execution environment must have access to the local BLE-capable device runtime. MCP does not independently bypass iOS or Android BLE permissions.
 
-### Layer 5 — AI Algorithms / Applications
+### Layer 5 — AI Algorithms / Applications (future)
 
-Algorithms are independent, pluggable components.
+Future perception and interaction algorithms can be independent, pluggable components. They are not included in the current MCP release.
 
 They should not be tightly coupled to BLE or GATT.
 
