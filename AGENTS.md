@@ -16,3 +16,8 @@ or disconnect after each message; clear when explicitly requested or at session
 shutdown. If the reporting service or device is unavailable, say so in chat;
 do not claim a message was projected based only on an HTTP/MCP receipt. Follow
 the operator's device safety instructions. See `docs/igasp.md` for setup.
+
+Status cards do not need a fixed visual style or template. Choose presentation
+appropriate to the message, agent, and device capabilities while keeping it
+legible. The current renderer's layout is an implementation, not a requirement
+that all future expressions look the same.

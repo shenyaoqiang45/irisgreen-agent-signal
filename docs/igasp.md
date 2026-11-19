@@ -127,8 +127,9 @@ not an outstanding acceptance item. A receiver embedder can pass `priorities`
 to `make_server`.
 Equal-priority sessions favor the most recently updated one. Declared style
 changes the ambient ring geometry; state and mood modulate its movement.
-Status cards target 48 px titles and 32 px supporting text. Long lines use
-spare rows before shrinking to fit the projection width.
+The current card renderer targets 48 px titles and 32 px supporting text; long
+lines use spare rows before shrinking to fit the projection width. This is the
+current implementation, not a required fixed style for future expressions.
 
 Add **one** output option to the receiver command. Omit `--seconds` for
 continuous operation; Ctrl+C clears and disconnects. Bounded test examples:
