@@ -1,0 +1,11 @@
+{
+  "protocol": "IGASP", "version": "1.0", "event_id": "boot_1",
+  "agent_id": "codex", "session_id": "session_001", "type": "agent.snapshot",
+  "timestamp": "2026-11-19T08:00:00Z",
+  "payload": {
+    "profile": {"display_name": "Codex", "personality": {"source": "self_declared", "framework": "MBTI", "type": "INTJ", "style": "minimal"}},
+    "status": {"state": "working", "mood": "focused"},
+    "tasks": [{"task_id": "t1", "status": "running", "title": "Review renderer", "progress": null}],
+    "expressions": []
+  }
+}

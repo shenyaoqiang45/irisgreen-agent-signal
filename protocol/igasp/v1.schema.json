@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IGASP v1 event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "version", "event_id", "agent_id", "session_id", "type", "timestamp", "payload"],
+  "properties": {
+    "protocol": {"const": "IGASP"}, "version": {"const": "1.0"},
+    "event_id": {"$ref": "#/$defs/id"}, "agent_id": {"$ref": "#/$defs/id"}, "session_id": {"$ref": "#/$defs/id"},
+    "timestamp": {"$ref": "#/$defs/time"}, "payload": {"type": "object"},
+    "type": {"enum": ["agent.profile", "agent.personality", "agent.status", "agent.task", "agent.expression", "agent.snapshot", "agent.session.started", "agent.session.ended", "agent.expression.ack", "agent.expression.clear", "agent.status.clear"]}
+  },
+  "allOf": [
+    {"if": {"properties": {"type": {"const": "agent.profile"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/profile"}}}},
+    {"if": {"properties": {"type": {"const": "agent.personality"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/personality"}}}},
+    {"if": {"properties": {"type": {"const": "agent.status"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/status"}}}},
+    {"if": {"properties": {"type": {"const": "agent.task"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/task"}}}},
+    {"if": {"properties": {"type": {"const": "agent.expression"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/expression"}}}},
+    {"if": {"properties": {"type": {"const": "agent.snapshot"}}}, "then": {"properties": {"payload": {"$ref": "#/$defs/snapshot"}}}},
+    {"if": {"properties": {"type": {"enum": ["agent.expression.ack", "agent.expression.clear"]}}}, "then": {"properties": {"payload": {"type": "object", "additionalProperties": false, "required": ["expression_id"], "properties": {"expression_id": {"$ref": "#/$defs/id"}}}}}},
+    {"if": {"properties": {"type": {"enum": ["agent.session.started", "agent.session.ended", "agent.status.clear"]}}}, "then": {"properties": {"payload": {"maxProperties": 0}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"},
+    "time": {"type": "string", "format": "date-time", "maxLength": 40, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001f\\u007f]+$"},
+    "profile": {"type": "object", "additionalProperties": false, "properties": {
+      "display_name": {"$ref": "#/$defs/text"}, "personality": {"$ref": "#/$defs/personality"}
+    }},
+    "personality": {"type": "object", "additionalProperties": false, "required": ["source"], "properties": {
+      "source": {"const": "self_declared"}, "framework": {"enum": ["MBTI", "custom"]},
+      "type": {"$ref": "#/$defs/text"}, "description": {"$ref": "#/$defs/text"}, "style": {"$ref": "#/$defs/text"}
+    }, "if": {"required": ["framework"], "properties": {"framework": {"const": "MBTI"}}},
+    "then": {"required": ["type"], "properties": {"type": {"pattern": "^[IE][NS][TF][JP]$"}}}},
+    "status": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {
+      "state": {"enum": ["idle", "thinking", "working", "waiting", "awaiting_approval", "completed", "failed"]},
+      "activity": {"$ref": "#/$defs/text"}, "mood": {"enum": [null, "focused", "curious", "confident", "cautious", "frustrated", "neutral"]}
+    }},
+    "task": {"type": "object", "additionalProperties": false, "required": ["task_id", "title", "status"], "properties": {
+      "task_id": {"$ref": "#/$defs/id"}, "title": {"$ref": "#/$defs/text"},
+      "status": {"enum": ["pending", "running", "waiting", "completed", "failed", "cancelled"]},
+      "current_step": {"$ref": "#/$defs/text"}, "progress": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+      "estimated_completion_time": {"anyOf": [{"$ref": "#/$defs/time"}, {"type": "null"}]}
+    }},
+    "expression": {"type": "object", "additionalProperties": false, "required": ["intent", "title"], "properties": {
+      "expression_id": {"$ref": "#/$defs/id"}, "intent": {"enum": ["discovery", "idea", "warning", "blocked", "approval_required", "user_input_required", "completed", "milestone"]},
+      "title": {"$ref": "#/$defs/text"}, "message": {"$ref": "#/$defs/text"}, "icon": {"$ref": "#/$defs/id"},
+      "urgency": {"enum": ["low", "normal", "urgent"]}, "duration_ms": {"type": "integer", "minimum": 1, "maximum": 3600000},
+      "ttl_ms": {"type": "integer", "minimum": 1, "maximum": 86400000}
+    }},
+    "snapshot": {"type": "object", "additionalProperties": false, "required": ["profile", "status", "tasks", "expressions"], "properties": {
+      "profile": {"$ref": "#/$defs/profile"}, "status": {"anyOf": [{"$ref": "#/$defs/status"}, {"type": "null"}]},
+      "tasks": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/task"}},
+      "expressions": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false,
+        "required": ["timestamp", "expression"], "properties": {"timestamp": {"$ref": "#/$defs/time"}, "expression": {"allOf": [{"$ref": "#/$defs/expression"}, {"required": ["expression_id"]}]}}}}
+    }}
+  }
+}
