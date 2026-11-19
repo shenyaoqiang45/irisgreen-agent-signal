@@ -49,6 +49,9 @@ def test_lists_every_capability_with_schemas(tmp_path):
     assert all(t.input_schema["type"] == "object" and t.output_schema["type"] == "object"
                for t in listing.tools)
     assert "project_image" in instructions
+    assert "do not disconnect after each one" in instructions
+    assert "do not clear between messages" in instructions
+    assert "Proactively report important discoveries" in instructions
 
 
 def test_errors_are_flagged_and_structured(tmp_path):

@@ -68,7 +68,7 @@ def test_display_and_validity_expire_independently():
     assert v.current().lines[1] == "thinking"
 
 
-def test_untimed_notice_holds_until_next_accepted_report_in_session():
+def test_untimed_notice_holds_until_next_expression_in_session():
     now = [datetime.now(timezone.utc).timestamp()]
     r = Receiver(clock=lambda: now[0])
     view = AgentPresentation(r)
@@ -81,9 +81,79 @@ def test_untimed_notice_holds_until_next_accepted_report_in_session():
     r.receive(envelope("agent.expression", "a", "s", {"intent": "idea", "title": "Second"}), "a")
     assert view.current().lines[1] == "Second"
     assert len(r.snapshot("a", "s")["payload"]["expressions"]) == 1
-    r.receive(envelope("agent.status", "a", "s", {"state": "working"}), "a")
-    assert view.current().lines[1] == "working"
-    assert not r.snapshot("a", "s")["payload"]["expressions"]
+    before = view.current()
+    r.receive(envelope("agent.status", "a", "s", {"state": "awaiting_approval"}), "a")
+    r.receive(envelope("agent.task", "a", "s", {"task_id": "t", "title": "Task", "status": "running"}), "a")
+    assert view.current() == before
+    snapshot = r.snapshot("a", "s")
+    assert snapshot["payload"]["expressions"][0]["expression"]["title"] == "Second"
+    r.receive(snapshot, "a")
+    assert view.current().lines[1] == "Second"
+    r.receive(envelope("agent.expression.clear", "a", "s", {
+        "expression_id": snapshot["payload"]["expressions"][0]["expression"]["expression_id"]}), "a")
+    assert view.current().lines[1] == "awaiting_approval"
+
+
+def test_live_output_reuses_connection_and_replaces_without_clearing(tmp_path, monkeypatch):
+    from agent_status import output
+
+    calls = []
+
+    class Device:
+        def __init__(self, **kwargs):
+            pass
+
+        async def connect(self):
+            calls.append(("connect",))
+            return {"ok": True}
+
+        async def push_frame(self, frame, seconds):
+            calls.append(("show", int(frame.sum()), seconds))
+            return {"ok": True}
+
+        async def clear(self):
+            calls.append(("clear",))
+            return {"ok": True}
+
+        async def disconnect(self):
+            calls.append(("disconnect",))
+            return {"ok": True}
+
+    monkeypatch.setattr(output, "McpDeviceAdapter", Device)
+    token = secrets.token_urlsafe(32)
+
+    async def run(server):
+        task = asyncio.create_task(output.project(server, "device", True, None))
+
+        async def wait_for(predicate):
+            for _ in range(100):
+                if predicate():
+                    return
+                await asyncio.sleep(.05)
+            pytest.fail(f"timed out waiting for output: {calls}")
+
+        try:
+            await wait_for(lambda: calls == [("connect",)])
+            for title in ("First", "Second"):
+                event = envelope("agent.expression", "a", "s", {"intent": "idea", "title": title})
+                assert (await asyncio.to_thread(send, event, token, server.server_port))["ok"]
+                expected = 1 if title == "First" else 2
+                await wait_for(lambda: len([c for c in calls if c[0] == "show"]) == expected)
+                if title == "First":
+                    status = envelope("agent.status", "a", "s", {"state": "working"})
+                    assert (await asyncio.to_thread(send, status, token, server.server_port))["ok"]
+                    await asyncio.sleep(.5)
+                    assert len([c for c in calls if c[0] == "show"]) == 1
+            assert [c[0] for c in calls] == ["connect", "show", "show"]
+            assert all(c[2] == 3600 for c in calls if c[0] == "show")
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert [c[0] for c in calls] == ["connect", "show", "show", "clear", "disconnect"]
+
+    with make_server({"a": token}, 0, tmp_path / "out.png") as server:
+        asyncio.run(run(server))
 
 
 @pytest.mark.parametrize("kind,payload", [
@@ -116,6 +186,8 @@ def test_stdio_and_http_share_authenticated_receiver(tmp_path):
                 async with Client(params) as client:
                     names = {t.name for t in (await client.list_tools()).tools}
                     assert "report_snapshot" in names and "project_image" not in names
+                    assert "Proactively report important discoveries" in client.instructions
+                    assert "a receipt does not prove projection" in client.instructions
                     result = await client.call_tool("report_status", {"session_id": "s", "status": {"mood": "focused"}})
                     assert not result.is_error, result.content
             asyncio.run(go())

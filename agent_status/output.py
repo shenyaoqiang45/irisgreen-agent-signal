@@ -34,10 +34,10 @@ async def project(server, address, simulate, seconds):
                             checked("clear", await device.clear())
                         previous = None
                     elif card.until > time.time() and (card != previous or time.monotonic() >= renew):
-                        hold = min(60.0, end - time.monotonic(), card.until - time.time())
+                        hold = min(3600.0, end - time.monotonic(), card.until - time.time())
                         if hold >= 0.1:
                             checked("project", await device.push_frame(frame, seconds=hold))
-                            previous, renew = card, time.monotonic() + max(1.0, hold - 10)
+                            previous, renew = card, time.monotonic() + max(1.0, hold - 30)
                 await asyncio.sleep(.2)
         finally:
             try:

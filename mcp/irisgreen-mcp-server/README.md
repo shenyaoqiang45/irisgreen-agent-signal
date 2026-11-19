@@ -53,9 +53,9 @@ args = ["<repo>/mcp/irisgreen-mcp-server/launch.py", "--address", "20:6E:F1:81:7
 
 ## What an agent does
 
-1. `device_connect` (with `address` when several projectors are in range).
-2. `project_image`, `project_animation` (1-10 frames, looped) or `project_point`, then `project_status` if it wants to confirm.
-3. `project_clear` before `device_disconnect`.
+1. `device_connect` once per interaction session (with `address` when several projectors are in range).
+2. `project_image`, `project_animation` (1-10 frames, looped) or `project_point`. Leave the connection open and replace the old image with the next one without clearing first. The hardware caps each playback at one hour; for automatic renewal use the continuous [status receiver](../../docs/igasp.md).
+3. `project_clear` when the user requests it or the session ends, then `device_disconnect`.
 
 The server's `instructions` field tells the agent this flow.
 

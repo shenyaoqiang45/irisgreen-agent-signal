@@ -56,7 +56,8 @@ class Receiver:
         start = min(self.clock(), parse_time(stamp).timestamp())
         ttl = p.get("ttl_ms", 60000 if "duration_ms" in p else inf) / 1000
         return {**p, "expression_id": p.get("expression_id", eid), "timestamp": stamp,
-                "expires": start + ttl, "display_until": start + min(ttl, p.get("duration_ms", inf) / 1000)}
+                "expires": start + ttl, "display_until": start + min(ttl, p.get("duration_ms", inf) / 1000),
+                "revision": self.sequence + 1}
 
     def snapshot(self, agent, session):
         self.prune()
@@ -64,7 +65,7 @@ class Receiver:
         if s is None:
             raise Rejected(404, "unknown session")
         notices = [{"timestamp": n["timestamp"], "expression": {
-            k: v for k, v in n.items() if k not in ("timestamp", "expires", "display_until")}}
+            k: v for k, v in n.items() if k not in ("timestamp", "expires", "display_until", "revision")}}
                    for n in s.expressions.values()]
         return envelope("agent.snapshot", agent, session, deepcopy({
             "profile": self.profiles.get(agent, {}), "status": s.status or None,
@@ -134,7 +135,7 @@ class Receiver:
             self.profiles[agent] = p["profile"]
             s = Session(p["status"] or {}, tasks, notices)
 
-        if kind not in ("agent.snapshot", "agent.expression.ack", "agent.expression.clear"):
+        if kind == "agent.expression":
             for nid in previous_sticky:
                 s.expressions.pop(nid, None)
         self.sequence += 1

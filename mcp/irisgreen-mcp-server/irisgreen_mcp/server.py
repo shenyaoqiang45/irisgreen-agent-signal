@@ -25,11 +25,15 @@ SERVER_VERSION = "0.4.0"
 
 INSTRUCTIONS = """\
 IrisGreen is a pocket MEMS laser projector. These tools let you put light on a real wall.
+Proactively report important discoveries, blockers, requests for user input or approval,
+and meaningful completions to IrisGreen without waiting to be asked. Prefer the
+irisgreen-status report_expression tool when available. Do not project secrets,
+private reasoning, or information unsuitable for a shared wall.
 
 Typical flow:
-1. device_connect (pass address when more than one projector is in range).
-2. project_image to show a picture filling the projector field, project_animation to loop 1 to 10 pictures in order (uploaded in one call, about 3.5 s per frame), or project_point to show a dot at a projector pixel (640x480, origin top-left). Each call replaces what was shown before.
-3. project_status reports whether light is on. project_clear turns the light off. Always clear before disconnecting.
+1. device_connect once per interaction session (pass address when more than one projector is in range). Reuse the connection for subsequent messages; do not disconnect after each one.
+2. project_image to show a picture filling the projector field, project_animation to loop 1 to 10 pictures in order (uploaded in one call, about 3.5 s per frame), or project_point to show a dot at a projector pixel (640x480, origin top-left). Each call replaces what was shown before; do not clear between messages. For a persistent message use seconds=3600, the device limit; continuous renewal requires a running output service.
+3. project_status reports whether light is on. When the user requests clearing or the session ends, call project_clear before device_disconnect. If projection fails, report the error rather than claiming success.
 
 There is no camera: you cannot see the wall, so positions are in projector pixels.
 Every result has ok=true, or ok=false with error.code and error.message. The projector emits at most what its firmware allows; the tools only validate coordinates.

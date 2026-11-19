@@ -48,12 +48,25 @@ an agent UI, run `python -m agent_status.demo --http` in an environment with
 the corresponding client credentials. Watch the receiver's `status.png`;
 the demo's seven saved files are a separate local replay.
 
+The repository supplies proactive-reporting instructions in `AGENTS.md`, the
+Cursor always-on rule, Copilot project instructions, and the MCP server
+instructions. Agents should report important discoveries, blockers, decisions
+and meaningful completions without waiting to be prompted. These are client
+instructions, not a way to force an agent or client to obey: enable the rule
+and MCP tools in the client, configure its credentials, run the receiver with
+device output enabled, and verify in that client. An HTTP/MCP receipt confirms
+the report was accepted, not that the projector displayed it. Surface delivery
+failures in chat.
+
 Suggested agent instructions:
 
 > Pick one session ID per conversation. Report major state changes, tasks and
 > important notices, not every token. Declare style or mood only if useful.
 > Omit unreliable progress/ETA. Do not send private reasoning or secrets.
 > Keep an approval request distinct from the user's actual approval.
+> Use `report_expression` without `duration_ms` or `ttl_ms` for messages to
+> the user; keep a stable session ID. Do not clear the display or disconnect
+> after each report. A new expression replaces the previous message.
 
 ## Wire contract and lifecycle
 
@@ -92,8 +105,10 @@ Updates apply in **arrival order**, not sender clock order. Use ordered writers
 per session; request a fresh snapshot after a missed sequence.
 
 Omit both `duration_ms` and `ttl_ms` for proactive messages: the notice stays
-until the next accepted report in that agent/session replaces it, or it is
-explicitly acknowledged/cleared. Duplicate retries do not dismiss it.
+until the next expression in that agent/session replaces it, or it is
+explicitly acknowledged/cleared. Status, task and profile reports and duplicate
+retries do not dismiss it. Other sessions' higher-priority notices can still
+preempt it; ending a session removes its messages.
 For temporary notices, `duration_ms` limits display and `ttl_ms` limits validity
 (default 60 s when only duration is supplied). Both start at the earlier of event time and
 receipt, so stale notices do not get a fresh display window on arrival.
@@ -130,6 +145,14 @@ frame rate. The output samples the latest scene rather than queueing every
 transition. It attempts clear and disconnect on shutdown. Confirm content,
 orientation, readability and final darkness **by eye**; a transport receipt
 does not verify any of these.
+
+The running receiver connects once and keeps its MCP client and device session
+for subsequent reports. It uploads a replacement without first clearing the
+display. An idle Bluetooth link may still drop independently; the existing
+device layer reconnects if needed before an upload. Hardware playback is capped
+at one hour, so a running receiver renews a persistent frame before it expires.
+Stopping the receiver intentionally clears and disconnects. Agent-facing HTTP
+and MCP acknowledgments confirm receipt, not that projection succeeded.
 
 **2026-11-19 verification:** Actual device MCP connected to
 `20:6E:F1:81:71:62`; manufacturer `AINSTEC`, firmware `36130326071700`,

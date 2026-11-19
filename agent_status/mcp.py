@@ -62,8 +62,15 @@ def build_server(agent, token, port):
                                     structured_content=result, is_error=not result["ok"])
 
     return Server("irisgreen-agent-status", version="1.0", on_call_tool=call, on_list_tools=listing,
-                  instructions="Report only your self-declared profile, status and important changes. "
-                  "Use a stable session_id and task_id. Never guess progress or ETA, report private "
+                  instructions="Proactively report important discoveries, blockers, requests for "
+                  "user input or approval, and meaningful completions using report_expression; "
+                  "do not wait to be asked. Do not project secrets or sensitive information. "
+                  "If reporting fails, tell the user; a receipt does not prove projection. "
+                  "Report only your self-declared profile, status and important changes. "
+                  "Use a stable session_id and task_id. For persistent messages omit duration_ms and "
+                  "ttl_ms; send a new expression to replace the previous message. Do not clear or "
+                  "disconnect between reports; the receiver owns the device connection. "
+                  "Never guess progress or ETA, report private "
                   "reasoning, or treat a notification acknowledgment as approval to act.")
 
 

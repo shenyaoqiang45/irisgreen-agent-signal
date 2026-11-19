@@ -26,17 +26,18 @@ class AgentPresentation:
             mood = s.status.get("mood") or ""
             pulse = {"idle": 0.6, "thinking": 1, "working": 2}.get(state, 0.8)
             pulse *= {"focused": 0.75, "curious": 1.4}.get(mood, 1)
-            if s.status or profile:
+            has_sticky = any(n["display_until"] == float("inf") for n in s.expressions.values())
+            if (s.status or profile) and not has_sticky:
                 level = "attention" if state in ("failed", "awaiting_approval") else "ambient"
                 cards.append(Card((source, state, s.status.get("activity", ""), mood, style),
                                   self.priorities[level], s.changed, pulse=pulse, accent=accent))
-            for task in reversed(s.tasks.values()):
+            for task in reversed(s.tasks.values() if not has_sticky else ()):
                 progress = task.get("progress")
                 cards.append(Card((source, task["title"], task.get("current_step", ""), task["status"],
                                    "" if progress is None else f"{progress:g}%",
                                    task.get("estimated_completion_time") or ""),
                                   self.priorities["task"], s.changed, accent=accent))
-            if s.finished_task:
+            if s.finished_task and not has_sticky:
                 task, until = s.finished_task
                 level = "attention" if task["status"] == "failed" else "task"
                 cards.insert(0, Card((source, task["title"], task["status"]),
@@ -45,7 +46,7 @@ class AgentPresentation:
                 level = ("urgent" if n.get("urgency") == "urgent" else
                          "attention" if n["intent"] == "approval_required" else "expression")
                 cards.insert(0, Card((source, n["title"], n["intent"], n.get("message", ""), n.get("icon", "")),
-                                     self.priorities[level], s.changed, n["display_until"], accent=accent))
+                                     self.priorities[level], n["revision"], n["display_until"], accent=accent))
         self.cards = cards
 
     def current(self, other_cards=()):
