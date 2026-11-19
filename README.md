@@ -12,6 +12,29 @@ The goal is to transform IrisGreen from a hardware-controlled projection device 
 
 ---
 
+## Let your AI agent put light on a wall
+
+IrisGreen now speaks **MCP (Model Context Protocol)**. Point your AI coding or work assistant at one command and say "project this image", "loop these five frames", or "turn the light off". The agent connects to the projector over Bluetooth and does it.
+
+| Agent | Status |
+|---|---|
+| **Cursor** | Verified: an agent projected through MCP tools on a real projector |
+| **VS Code Copilot** (agent mode) | Verified: an agent projected through MCP tools on a real projector |
+| **WorkBuddy** | Config included ([.mcp.json](.mcp.json)); real-device run still to do |
+| **Kimi Work** | Standard stdio MCP server, same command; not yet run |
+| **Codex** | Standard stdio MCP server, same command; not yet run |
+
+Eight tools: connect and disconnect, show a single image, loop a 1-10 frame animation, show a dot, clear, and check status. No SDK to learn and no Bluetooth code to write.
+
+```text
+python mcp/irisgreen-mcp-server/launch.py --simulate   # try it with no hardware
+python mcp/irisgreen-mcp-server/launch.py              # real IrisGreen over Bluetooth
+```
+
+Setup for each client, including Codex (`~/.codex/config.toml`), is in the [MCP server guide](mcp/irisgreen-mcp-server/README.md#client-configuration).
+
+---
+
 ## 1. Project Vision
 
 Traditional AI interfaces primarily operate in digital environments:

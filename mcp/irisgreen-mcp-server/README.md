@@ -41,12 +41,20 @@ All three launch the same command, so the same tools appear:
 }
 ```
 
-Claude Desktop and other clients take the same `command` / `args` under `mcpServers` in their own config file.
+Claude Desktop, Kimi Work and other clients take the same `command` / `args` under `mcpServers` (or their own equivalent key) in their config file; only VS Code and Cursor have been run on a real device so far.
+
+Codex takes the same command in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.irisgreen]
+command = "<repo>/.venv/Scripts/python.exe"
+args = ["<repo>/mcp/irisgreen-mcp-server/launch.py", "--address", "20:6E:F1:81:71:62"]
+```
 
 ## What an agent does
 
 1. `device_connect` (with `address` when several projectors are in range).
-2. `project_image` (or `project_point`), then `project_status` if it wants to confirm.
+2. `project_image`, `project_animation` (1-10 frames, looped) or `project_point`, then `project_status` if it wants to confirm.
 3. `project_clear` before `device_disconnect`.
 
 The server's `instructions` field tells the agent this flow.
