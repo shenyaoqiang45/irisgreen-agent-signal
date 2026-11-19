@@ -146,6 +146,14 @@ def test_project_animation_stores_frames_in_group_one_and_replaces_stale_ones(st
     assert play[0][2:] == bytes([1, 120, 0, 3, 0, 1])  # loop, 12 s, 250 ms -> 3 units, group 1
 
 
+def test_project_animation_default_frame_time_is_150ms_rounded_to_the_device_step(stack):
+    registry, _, rig = stack
+    items = [{"image_base64": png_b64(np.full((20, 20), 255, np.uint8))}] * 2
+    run_all(registry, [("device.connect", {}), ("project.animation", {"frames": items, "seconds": 10})])
+    play = [c for c in rig.transport.commands if c[0] == 0xA0]
+    assert play[0][2:] == bytes([1, 100, 0, 2, 0, 1])  # 150 ms -> 2 units of 100 ms
+
+
 def test_project_animation_validates_frames(stack):
     registry, _, rig = stack
     image = png_b64(np.full((20, 20), 255, np.uint8))

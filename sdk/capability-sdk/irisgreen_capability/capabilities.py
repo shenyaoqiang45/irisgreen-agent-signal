@@ -25,6 +25,7 @@ Handler = Callable[[dict], Awaitable[dict]]
 
 NUMBER = {"type": "number"}
 POINT = {"type": "array", "items": NUMBER, "minItems": 2, "maxItems": 2}
+DEFAULT_FRAME_MS = 150
 
 
 def _object(properties: dict, required: tuple[str, ...] = ()) -> dict:
@@ -201,8 +202,9 @@ def build_capabilities(rt: Runtime) -> list[Capability]:
                 "maxItems": SLOT_MAX_FRAMES,
                 "items": _object({"image_path": {"type": "string"}, "image_base64": {"type": "string"}}),
             },
-            "frame_ms": {"type": "integer", "minimum": 100, "maximum": 60000, "default": 300,
-                         "description": "how long each frame stays up, in milliseconds"},
+            "frame_ms": {"type": "integer", "minimum": 100, "maximum": 60000, "default": DEFAULT_FRAME_MS,
+                         "description": "how long each frame stays up, in milliseconds; the device "
+                                        "counts in 100 ms steps, so other values are rounded (halves up)"},
             "mode": {"enum": list(MODES), "default": "threshold"},
             "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600, "default": 3600},
         }, ("frames",)),
@@ -212,7 +214,7 @@ def build_capabilities(rt: Runtime) -> list[Capability]:
         device = rt.require_device()
         mode = args.get("mode", "threshold")
         masks = [_full_field_mask(frame, mode) for frame in args["frames"]]
-        await device.show_masks(masks, float(args.get("seconds", 3600)), int(args.get("frame_ms", 300)))
+        await device.show_masks(masks, float(args.get("seconds", 3600)), int(args.get("frame_ms", DEFAULT_FRAME_MS)))
         return {"ok": True, "frames": len(masks), "lit_pixels": [int(m.sum()) for m in masks]}
 
     @cap(

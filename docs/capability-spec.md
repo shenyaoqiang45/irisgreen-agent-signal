@@ -33,7 +33,7 @@ There is no camera, calibration or tracking capability ([ADR 0001](adr/0001-remo
 |---|---|---|
 | `project.point` | `x`, `y` in projector pixels; `radius` 2-60 (12); `seconds` up to 3600 | `projector` position of the dot |
 | `project.image` | one of `image_path` (inside the data directory) or `image_base64`; `mode` `threshold` (default), `threshold_inv`, `otsu`, `dither`, `dither_flat`, `edges`; `seconds` | `lit_pixels`. The image fills the field |
-| `project.animation` | `frames`: 1-10 items, each one of `image_path` or `image_base64`; `frame_ms` 100-60000 (300); `mode`; `seconds` | `frames`, `lit_pixels` per frame. Stores the frames in group 1 and loops them; replaces what was shown. Every frame is uploaded (about 3.5 s each) |
+| `project.animation` | `frames`: 1-10 items, each one of `image_path` or `image_base64`; `frame_ms` 100-60000 (150, which the device's 100 ms step rounds to 200); `mode`; `seconds` | `frames`, `lit_pixels` per frame. Stores the frames in group 1 and loops them; replaces what was shown. Every frame is uploaded (about 3.5 s each) |
 | `project.clear` | none | Projects black so no light is emitted |
 | `project.status` | none | `projecting`, `last_projection` |
 
