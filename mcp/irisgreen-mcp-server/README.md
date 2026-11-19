@@ -2,7 +2,7 @@
 
 Exposes the [capability set](../../docs/capability-spec.md) to AI agents as MCP tools (roadmap V0.4). The server is only the agent-facing interface; BLE and projection live in the [Capability SDK](../../sdk/capability-sdk). The machine running it must have a Bluetooth adapter: MCP does not bypass operating-system Bluetooth permissions.
 
-7 tools, named with underscores: `device_connect`, `device_disconnect`, `device_get_status`, `project_point`, `project_image`, `project_clear`, `project_status`. Results are JSON text plus structured content, with `isError` set on failure. There is no camera ([ADR 0001](../../docs/adr/0001-remove-camera-pipeline.md)): positions are in projector pixels (640x480).
+8 tools, named with underscores: `device_connect`, `device_disconnect`, `device_get_status`, `project_point`, `project_image`, `project_animation`, `project_clear`, `project_status`. Results are JSON text plus structured content, with `isError` set on failure. There is no camera ([ADR 0001](../../docs/adr/0001-remove-camera-pipeline.md)): positions are in projector pixels (640x480).
 
 ## Run
 

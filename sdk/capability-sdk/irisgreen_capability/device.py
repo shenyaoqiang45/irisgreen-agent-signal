@@ -16,6 +16,8 @@ from .errors import DEVICE_ERROR, INVALID_ARGUMENT, NOT_CONNECTED, CapabilityErr
 # overwrites its first frame rather than deleting the group each time, which
 # would blank the beam between uploads.
 SLOT_GROUP = 1
+# The device holds at most 10 frames in the boot group (confirmed in IrisLoop).
+SLOT_MAX_FRAMES = 10
 PLAY_UNIT_MS = 100
 PLAY_CAP_UNITS = 36000
 
@@ -59,7 +61,8 @@ class IrisDevice:
         self.connected = False
         self.projecting = False
         self.last_projection: dict | None = None
-        self._slot_ready = False
+        # Frames known to be in the slot; None while the device's state is unknown.
+        self._slot_frames: int | None = None
         self._lock = asyncio.Lock()
 
     async def connect(self) -> None:
@@ -73,7 +76,7 @@ class IrisDevice:
                 pass
             raise CapabilityError(DEVICE_ERROR, f"cannot connect: {exc}") from exc
         self.connected = True
-        self._slot_ready = False
+        self._slot_frames = None
 
     async def disconnect(self) -> None:
         """Drop the BLE link. Playback already started keeps running on the device."""
@@ -114,39 +117,63 @@ class IrisDevice:
         }
 
     async def show_mask(self, mask: np.ndarray, seconds: float = 3600.0) -> None:
-        """Upload a 640x480 binary mask and play it. Calls are serialized."""
+        """Upload one 640x480 binary mask and play it. Calls are serialized."""
+        await self.show_masks([mask], seconds)
+
+    async def show_masks(
+        self, masks: list[np.ndarray], seconds: float = 3600.0, frame_ms: int = 1000
+    ) -> None:
+        """Store up to 10 masks in group 1 and loop them, `frame_ms` per frame.
+
+        A single mask overwrites frame 1 without deleting the group, so a live
+        update does not blank the beam. Several frames always start from a
+        cleared group so stale frames from an earlier upload cannot play.
+        """
         self._require()
-        if mask.shape != (image_pack.HEIGHT, image_pack.WIDTH):
+        if not 1 <= len(masks) <= SLOT_MAX_FRAMES:
             raise CapabilityError(
-                INVALID_ARGUMENT,
-                f"mask must be {image_pack.HEIGHT}x{image_pack.WIDTH}, got {mask.shape}",
+                INVALID_ARGUMENT, f"group {SLOT_GROUP} holds 1 to {SLOT_MAX_FRAMES} frames, got {len(masks)}"
             )
+        for mask in masks:
+            if mask.shape != (image_pack.HEIGHT, image_pack.WIDTH):
+                raise CapabilityError(
+                    INVALID_ARGUMENT,
+                    f"mask must be {image_pack.HEIGHT}x{image_pack.WIDTH}, got {mask.shape}",
+                )
         try:
-            total, interval = play_units(seconds)
+            total, interval = play_units(seconds, frame_ms)
         except ValueError as exc:
             raise CapabilityError(INVALID_ARGUMENT, str(exc)) from exc
 
         async with self._lock:
             await self._ensure_link()
-            if not self._slot_ready:
-                deleted = await self.client.send_command(P.cmd_delete_group(SLOT_GROUP))
-                if not deleted.ok:
-                    raise CapabilityError(DEVICE_ERROR, deleted.error or "could not clear slot")
-                await asyncio.sleep(self.clear_s)
-                self._slot_ready = True
-            await self.client.push_file(
-                image_pack.build_stream(mask), f"{SLOT_GROUP}_1.bmp"
-            )
-            await self.client.stop()
-            await asyncio.sleep(self.settle_s)
-            played = await self.client.play(SLOT_GROUP, True, total, interval)
-            if not played.ok:
-                raise CapabilityError(DEVICE_ERROR, played.error or "play was rejected")
+            try:
+                if len(masks) > 1 or self._slot_frames != 1:
+                    self._slot_frames = None
+                    deleted = await self.client.send_command(P.cmd_delete_group(SLOT_GROUP))
+                    if not deleted.ok:
+                        raise CapabilityError(DEVICE_ERROR, deleted.error or "could not clear slot")
+                    await asyncio.sleep(self.clear_s)
+                for index, mask in enumerate(masks, 1):
+                    self._slot_frames = None
+                    await self.client.push_file(image_pack.build_stream(mask), f"{SLOT_GROUP}_{index}.bmp")
+                self._slot_frames = len(masks)
+                await self.client.stop()
+                await asyncio.sleep(self.settle_s)
+                played = await self.client.play(SLOT_GROUP, True, total, interval)
+                if not played.ok:
+                    raise CapabilityError(DEVICE_ERROR, played.error or "play was rejected")
+            except BaseException:
+                self._slot_frames = None
+                raise
         self.projecting = True
+        lit = [int(mask.sum()) for mask in masks]
         self.last_projection = {
-            "lit_pixels": int(mask.sum()),
+            "lit_pixels": lit[0] if len(lit) == 1 else lit,
             "seconds": total * PLAY_UNIT_MS / 1000,
         }
+        if len(masks) > 1:
+            self.last_projection.update(frames=len(masks), frame_ms=interval * PLAY_UNIT_MS)
 
     async def clear(self, seconds: float = 5.0) -> None:
         """Project black so no light is emitted."""

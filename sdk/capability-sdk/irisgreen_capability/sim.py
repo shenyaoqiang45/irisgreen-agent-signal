@@ -21,6 +21,8 @@ class SimWorld:
         self.mask = np.zeros((image_pack.HEIGHT, image_pack.WIDTH), np.uint8)
         self.playing = False
         self.uploads: list[tuple[str, int]] = []
+        # Stored group-1 frames by file name; a delete clears them like the device does.
+        self.files: dict[str, np.ndarray] = {}
 
 
 class SimTransport(Transport):
@@ -89,6 +91,7 @@ class SimTransport(Transport):
                     f"expected {self._upload_size}"
                 )
             self.world.mask = image_pack.unpack(bytes(self._upload))
+            self.world.files[self._upload_name] = self.world.mask
             self.world.uploads.append((self._upload_name, len(self._upload)))
             self._upload = None
 
@@ -103,6 +106,7 @@ class SimTransport(Transport):
             self.world.playing = False
         elif cmd == P.CMD_DELETE_PIC:
             self.world.mask = np.zeros_like(self.world.mask)
+            self.world.files.clear()
             self.world.playing = False
         if is_read:
             body = {P.CMD_BRIGHTNESS: b"\x32", P.CMD_PIC_COUNT: b"\x01\x00"}.get(cmd, b"\x00")

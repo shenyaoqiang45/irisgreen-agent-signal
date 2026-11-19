@@ -16,7 +16,7 @@ import jsonschema
 import numpy as np
 
 from . import errors as E
-from .device import IrisDevice
+from .device import SLOT_MAX_FRAMES, IrisDevice
 from .errors import CapabilityError
 from .render import MODES, PROJ_HEIGHT, PROJ_WIDTH, in_projection_field, make_dot_image, to_1bpp
 from .runtime import Runtime
@@ -160,7 +160,22 @@ def build_capabilities(rt: Runtime) -> list[Capability]:
         )
         return {"ok": True, "projector": [x, y]}
 
-    @cap(
+    def _full_field_mask(args: dict, mode: str) -> np.ndarray:
+        gray = _decode_image(rt, args)
+        resized = cv2.resize(gray, (PROJ_WIDTH, PROJ_HEIGHT), interpolation=cv2.INTER_AREA)
+        try:
+            mask = to_1bpp(resized, mode)
+        except ValueError as exc:
+            raise _invalid(str(exc)) from exc
+        return mask[:, ::-1].copy() if rt.mirror_full_field else mask
+
+    async def project_image(args: dict) -> dict:
+        device = rt.require_device()
+        mask = _full_field_mask(args, args.get("mode", "threshold"))
+        await device.show_mask(mask, float(args.get("seconds", 3600)))
+        return {"ok": True, "lit_pixels": int(mask.sum())}
+
+    cap(
         "project.image",
         "Project an image as 1-bit light, filling the projector field. Give image_path "
         "(a file inside the data directory) or image_base64.",
@@ -171,19 +186,34 @@ def build_capabilities(rt: Runtime) -> list[Capability]:
             "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600, "default": 3600},
         }),
         _result({"lit_pixels": {"type": "integer"}}),
+    )(project_image)
+
+    @cap(
+        "project.animation",
+        f"Store 1 to {SLOT_MAX_FRAMES} images in the projector's cache at once and loop them in order, "
+        "like a slideshow, each filling the projector field. It replaces whatever was projected before. "
+        "Every frame is uploaded over Bluetooth (about 3.5 s each), so a full set takes about "
+        "half a minute. Give each frame as image_path (a file inside the data directory) or image_base64.",
+        _object({
+            "frames": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": SLOT_MAX_FRAMES,
+                "items": _object({"image_path": {"type": "string"}, "image_base64": {"type": "string"}}),
+            },
+            "frame_ms": {"type": "integer", "minimum": 100, "maximum": 60000, "default": 300,
+                         "description": "how long each frame stays up, in milliseconds"},
+            "mode": {"enum": list(MODES), "default": "threshold"},
+            "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600, "default": 3600},
+        }, ("frames",)),
+        _result({"frames": {"type": "integer"}, "lit_pixels": {"type": "array", "items": {"type": "integer"}}}),
     )
-    async def project_image(args: dict) -> dict:
+    async def project_animation(args: dict) -> dict:
         device = rt.require_device()
-        gray = _decode_image(rt, args)
-        resized = cv2.resize(gray, (PROJ_WIDTH, PROJ_HEIGHT), interpolation=cv2.INTER_AREA)
-        try:
-            mask = to_1bpp(resized, args.get("mode", "threshold"))
-        except ValueError as exc:
-            raise _invalid(str(exc)) from exc
-        if rt.mirror_full_field:
-            mask = mask[:, ::-1].copy()
-        await device.show_mask(mask, float(args.get("seconds", 3600)))
-        return {"ok": True, "lit_pixels": int(mask.sum())}
+        mode = args.get("mode", "threshold")
+        masks = [_full_field_mask(frame, mode) for frame in args["frames"]]
+        await device.show_masks(masks, float(args.get("seconds", 3600)), int(args.get("frame_ms", 300)))
+        return {"ok": True, "frames": len(masks), "lit_pixels": [int(m.sum()) for m in masks]}
 
     @cap(
         "project.clear",

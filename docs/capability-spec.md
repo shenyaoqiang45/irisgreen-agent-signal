@@ -33,13 +33,16 @@ There is no camera, calibration or tracking capability ([ADR 0001](adr/0001-remo
 |---|---|---|
 | `project.point` | `x`, `y` in projector pixels; `radius` 2-60 (12); `seconds` up to 3600 | `projector` position of the dot |
 | `project.image` | one of `image_path` (inside the data directory) or `image_base64`; `mode` `threshold` (default), `threshold_inv`, `otsu`, `dither`, `dither_flat`, `edges`; `seconds` | `lit_pixels`. The image fills the field |
+| `project.animation` | `frames`: 1-10 items, each one of `image_path` or `image_base64`; `frame_ms` 100-60000 (300); `mode`; `seconds` | `frames`, `lit_pixels` per frame. Stores the frames in group 1 and loops them; replaces what was shown. Every frame is uploaded (about 3.5 s each) |
 | `project.clear` | none | Projects black so no light is emitted |
 | `project.status` | none | `projecting`, `last_projection` |
 
+Both `project.image` and `project.animation` use only group 1 (the boot group), so the device holds one projection at a time. A single image overwrites frame 1 without clearing the group; several frames always start from a cleared group, and a single image after an animation clears it first so no stale frames play. The 10-frame limit comes from the IrisLoop project; it is not yet confirmed on this device.
+
 ### Orientation
 
-With the device's mirror setting at 0 (the default) the wall shows a projected image horizontally mirrored. `project.image` therefore mirrors the image first when the runtime has `mirror_full_field` set; the MCP server sets it unless started with `--no-pre-mirror`. `project.point` is not mirrored: `x` is the projector's own coordinate.
+With the device's mirror setting at 0 (the default) the wall shows a projected image horizontally mirrored. `project.image` and `project.animation` therefore mirror each image first when the runtime has `mirror_full_field` set; the MCP server sets it unless started with `--no-pre-mirror`. `project.point` is not mirrored: `x` is the projector's own coordinate.
 
 ## Not yet covered
 
-Everything here is tested against the simulator. On real hardware only the MCP flow connect, `project.image`, `project.status`, `project.clear`, `device.disconnect` has been run (see [hardware-verification.md](hardware-verification.md)).
+Everything here is tested against the simulator. On real hardware only the MCP flow connect, `project.image`, `project.status`, `project.clear`, `device.disconnect` has been run (see [hardware-verification.md](hardware-verification.md)); `project.animation` has not.

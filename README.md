@@ -317,7 +317,7 @@ AI-native physical interaction.**
 | V0.1 | IrisGreen GATT Profile | PC, Android and iOS can connect | Specified and implemented ([docs](docs/gatt-profile.md)). **Verified on PC** with a real IrisGreen; Android and iOS not yet verified |
 | V0.2 | BLE Protocol SDK | Images and commands transfer across platforms | Python and Flutter SDKs agree on shared golden vectors. **Verified on PC**: commands, and 50 of 50 image uploads on a real device; Android and iOS not yet verified |
 | V0.3 | Capability SDK | Unified projection and status interfaces | Implemented ([spec](docs/capability-spec.md)), tested against the simulator. No camera ([ADR 0001](docs/adr/0001-remove-camera-pipeline.md)) |
-| V0.4 | MCP Server | An AI Agent can call the device | Implemented, 7 tools, tested over in-memory and stdio MCP. A scripted MCP client projected an image on a real device |
+| V0.4 | MCP Server | An AI Agent can call the device | Implemented, 8 tools, tested over in-memory and stdio MCP. A scripted MCP client projected an image on a real device (`project_animation` is simulator-only so far) |
 | V0.5 | Reference Algorithms | Reference tracking, calibration and mapping | Removed with the camera pipeline; recoverable from branch `archive/camera-pipeline` |
 | V1.0 | AI Physical Interface | An AI Agent completes a vision-to-physical-projection task on its own | Deferred until a camera is reintroduced |
 

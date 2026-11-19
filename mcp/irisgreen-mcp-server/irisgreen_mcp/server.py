@@ -28,7 +28,7 @@ IrisGreen is a pocket MEMS laser projector. These tools let you put light on a r
 
 Typical flow:
 1. device_connect (pass address when more than one projector is in range).
-2. project_image to show a picture filling the projector field, or project_point to show a dot at a projector pixel (640x480, origin top-left).
+2. project_image to show a picture filling the projector field, project_animation to loop 1 to 10 pictures in order (uploaded in one call, about 3.5 s per frame), or project_point to show a dot at a projector pixel (640x480, origin top-left). Each call replaces what was shown before.
 3. project_status reports whether light is on. project_clear turns the light off. Always clear before disconnecting.
 
 There is no camera: you cannot see the wall, so positions are in projector pixels.

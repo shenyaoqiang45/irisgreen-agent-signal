@@ -39,7 +39,7 @@ def test_every_capability_has_schemas_and_a_description(stack):
     registry, _, _ = stack
     assert registry.names() == [
         "device.connect", "device.disconnect", "device.get_status",
-        "project.point", "project.image", "project.clear", "project.status",
+        "project.point", "project.image", "project.animation", "project.clear", "project.status",
     ]
     for cap in registry:
         assert cap.description and cap.input_schema["type"] == "object"
@@ -121,6 +121,40 @@ def test_project_image_is_pre_mirrored_when_enabled(stack, tmp_path):
     cv2.imwrite(str(tmp_path / "bar.png"), image)
     run_all(registry, [("device.connect", {}), ("project.image", {"image_path": "bar.png"})])
     assert rig.world.mask[:, -100:].all() and not rig.world.mask[:, :100].any()
+
+
+def test_project_animation_stores_frames_in_group_one_and_replaces_stale_ones(stack):
+    registry, _, rig = stack
+    frames = [np.full((120, 160), v, np.uint8) for v in (255, 0, 255)]
+    items = [{"image_base64": png_b64(f)} for f in frames]
+    results = run_all(registry, [
+        ("device.connect", {}),
+        ("project.animation", {"frames": items, "frame_ms": 250, "seconds": 12}),
+        ("project.status", {}),
+        ("project.animation", {"frames": items[:2]}),
+        ("project.image", {"image_base64": items[0]["image_base64"]}),
+    ])
+    first, status = results[1], results[2]
+    assert first["ok"] and first["frames"] == 3 and first["lit_pixels"][1] == 0 and first["lit_pixels"][0] > 0
+    assert status["last_projection"]["frames"] == 3 and status["last_projection"]["frame_ms"] == 300  # 250 ms rounds to the device's 100 ms unit
+    assert results[3]["ok"] and results[4]["ok"]
+    names = [n for n, _ in rig.world.uploads]
+    assert names == ["1_1.bmp", "1_2.bmp", "1_3.bmp", "1_1.bmp", "1_2.bmp", "1_1.bmp"]
+    # the single image started from a cleared group: no frame 2 left to play
+    assert list(rig.world.files) == ["1_1.bmp"]
+    play = [c for c in rig.transport.commands if c[0] == 0xA0]
+    assert play[0][2:] == bytes([1, 120, 0, 3, 0, 1])  # loop, 12 s, 250 ms -> 3 units, group 1
+
+
+def test_project_animation_validates_frames(stack):
+    registry, _, rig = stack
+    image = png_b64(np.full((20, 20), 255, np.uint8))
+    run_all(registry, [("device.connect", {})])
+    too_many = [{"image_base64": image}] * 11
+    for frames in ([], too_many, [{}], [{"image_base64": image, "image_path": "a.png"}]):
+        result = call(registry, "project.animation", frames=frames)
+        assert result["ok"] is False and result["error"]["code"] == "invalid_argument", frames
+    assert rig.world.uploads == []
 
 
 def test_project_image_path_cannot_escape_the_data_directory(stack, tmp_path):

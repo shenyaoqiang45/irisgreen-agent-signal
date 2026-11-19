@@ -39,7 +39,7 @@ def test_lists_every_capability_with_schemas(tmp_path):
     names = {t.name for t in listing.tools}
     assert names == {
         "device_connect", "device_disconnect", "device_get_status",
-        "project_point", "project_image", "project_clear", "project_status",
+        "project_point", "project_image", "project_animation", "project_clear", "project_status",
     }
     assert all(n.replace("_", "").isalnum() for n in names)  # every client's name rules
     point = next(t for t in listing.tools if t.name == "project_point")
@@ -136,5 +136,5 @@ def test_stdio_entry_point_serves_the_simulator(tmp_path):
             return len(tools.tools), connected, status
 
     count, connected, status = asyncio.run(asyncio.wait_for(go(), 60))
-    assert count == 7
+    assert count == 8
     assert not connected.is_error and structured(status)["connected"] is True
