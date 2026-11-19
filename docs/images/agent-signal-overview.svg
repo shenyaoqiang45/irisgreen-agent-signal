@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">从对话框到墙上</title>
+  <desc id="desc">左边是 Agent 的对话框，中间是 IrisGreen 投影器，右边墙面显示「测试通过，等你确认」。这是工作示意，并非产品照片。</desc>
+  <rect width="960" height="360" rx="20" fill="#102423"/>
+  <g font-family="system-ui, 'Microsoft YaHei', sans-serif">
+    <text x="38" y="58" font-size="32" fill="#f3faf6" font-weight="bold">从对话框到墙上</text>
+    <rect x="38" y="106" width="228" height="119" rx="14" fill="#f3faf6"/>
+    <text x="57" y="147" font-size="24" font-weight="bold" fill="#17342e">Agent</text>
+    <text x="57" y="189" font-size="21" fill="#26473f">测试通过，等你确认。</text>
+    <path d="M281 167h53m-12-10 12 10-12 10" fill="none" stroke="#96e2ba" stroke-width="4"/>
+    <path d="m470 168 115-62v122z" fill="#305b45"/>
+    <rect x="353" y="138" width="124" height="61" rx="16" fill="#c6d9d4"/>
+    <circle cx="451" cy="168" r="13" fill="#17342e"/>
+    <circle cx="451" cy="168" r="7" fill="#a5ffc4"/>
+    <rect x="583" y="94" width="337" height="146" rx="8" fill="#18392c" stroke="#497b61" stroke-width="2"/>
+    <text x="608" y="151" font-size="34" fill="#a5ffc4" font-weight="bold">测试通过</text>
+    <text x="608" y="201" font-size="34" fill="#a5ffc4">等你确认</text>
+    <g fill="#e1efe8" text-anchor="middle" font-size="23">
+      <text x="152" y="290">① Agent 主动上报</text>
+      <text x="415" y="290">② IrisGreen 投影</text>
+      <text x="752" y="290">③ 你抬头就能看到</text>
+    </g>
+  </g>
+</svg>

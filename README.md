@@ -2,6 +2,10 @@
 
 **不必盯着聊天窗口。Agent 需要你时，抬头就能看见。**
 
+**[购买 IrisGreen 投影器 →](https://irisarworld.com/irisgreen/?utm_source=github&utm_medium=readme&utm_campaign=irisgreen-agent-signal)** · [没有设备？先试模拟器](#今天可以试什么)
+
+![工作示意：Agent 报告「测试通过，等你确认」，IrisGreen 把这句话投到墙上。你抬头就能看到，需要回复时再回到原对话。](docs/images/agent-signal-overview.svg)
+
 一次真机测试里，Agent 在墙上投了一句话：「你不用盯着屏幕。有重要发现，我会告诉你。」对面的人回了一句：「嗯我看到了。」
 
 这就是 IrisGreen Agent Signal 要做的事：给你和 Agent 之间留一个不用守在屏幕前的联络方式。日常工作安静进行；遇到关键发现、需要你决定、或终于完成时，Agent 可以把一句值得你抬头的话投出来。细节和回复仍留在你原来的对话里。
@@ -34,4 +38,4 @@ python examples/image-projection/main.py --simulate
 
 这个仓库只做 **Agent 与人的物理交互**。音乐可视化、歌词、娱乐播放和通用投影应用不在路线图里。协议、渲染器和设备 SDK 留在这里，是为了让 Agent 的一句重要消息可靠地到达你面前。
 
-[了解 IrisGreen 投影器](https://irisarworld.com/irisgreen/)
+[购买 IrisGreen 投影器 →](https://irisarworld.com/irisgreen/?utm_source=github&utm_medium=readme&utm_campaign=irisgreen-agent-signal)
