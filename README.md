@@ -24,7 +24,7 @@ IrisGreen speaks **MCP (Model Context Protocol)**, so compatible coding and work
 | **VS Code Copilot** (agent mode) | Verified: an agent projected through MCP tools on a real projector |
 | **WorkBuddy** | Verified on hardware; config included ([.mcp.json](.mcp.json)) |
 | **Kimi Work** | Verified on hardware |
-| **Codex** | Standard stdio MCP configuration documented; not yet verified |
+| **Codex** | Verified by the user; standard stdio MCP configuration documented |
 
 ### Give it a physical task
 
