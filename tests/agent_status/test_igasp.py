@@ -156,6 +156,74 @@ def test_live_output_reuses_connection_and_replaces_without_clearing(tmp_path, m
         asyncio.run(run(server))
 
 
+def test_card_layout_spreads_content_and_keeps_masks_inside_field(monkeypatch):
+    from visualizer.core.presentation import Card
+    from visualizer.renderer import card as card_module
+
+    calls = []
+    original = card_module.blit
+
+    def checked_blit(frame, mask, x, y, **kwargs):
+        left, top = x - mask.shape[1] // 2, y - mask.shape[0] // 2
+        assert left >= 0 and top >= 0
+        assert left + mask.shape[1] <= frame.shape[1]
+        assert top + mask.shape[0] <= frame.shape[0]
+        calls.append((left, top, mask.shape, y))
+        original(frame, mask, x, y, **kwargs)
+
+    monkeypatch.setattr(card_module, "blit", checked_blit)
+    renderer = card_module.CardRenderer()
+    card = Card(("agent / session", "Important update", "warning", "Please review the change."), 1, 1)
+    frame = renderer.frame(card, 0)
+    assert frame.shape == (480, 640) and frame.any()
+    assert calls[1][0] < frame.shape[1] // 4
+    assert calls[-1][1] - calls[0][1] > 150
+    assert all(calls[i][1] + calls[i][2][0] < calls[i + 1][1] for i in range(len(calls) - 1))
+    assert len({calls[i + 1][3] - calls[i][3] for i in range(len(calls) - 1)}) == 1
+
+
+def test_card_wraps_long_text_and_marks_extreme_overflow():
+    from visualizer.core.presentation import Card
+    from visualizer.renderer.card import CardRenderer
+
+    renderer = CardRenderer()
+    message = "A" * 160
+    groups = renderer._content(("Title", "warning", message))
+    assert "".join(row[0] for row in groups[-1]) == message
+    assert len(groups[-1]) > 1
+    overflow = renderer._content(("W" * 160,) * 4)
+    assert overflow[-1][-1][0].endswith("…")
+    assert renderer.frame(Card(("agent", "A" * 160, "B" * 160, "C" * 160, "D" * 160), 1, 1), 0).any()
+
+
+def test_expression_uses_uniform_font_size(monkeypatch):
+    from visualizer.renderer.card import CardRenderer
+
+    renderer = CardRenderer()
+    if not renderer.supports_cjk:
+        pytest.skip("requires a CJK font")
+    title = "我发现了一个需要注意的问题"
+    message = "当多个代理同时上报时，需要使用同一个接收器，避免设备连接发生冲突。"
+    receiver = Receiver()
+    presentation = AgentPresentation(receiver)
+    receiver.receive(envelope("agent.expression", "copilot", "this-chat",
+                              {"title": title, "intent": "warning", "message": message}), "copilot")
+    card = presentation.current()
+    groups = renderer._content(card.lines[1:], include_source=True)
+    assert len(groups[-1]) == 3
+    assert "".join(row[0] for row in groups[-1]) == message
+    assert {row[1] for group in groups for row in group} == {48}
+
+    sizes = {}
+    original = renderer._label
+    def label(text, size):
+        sizes[text] = size
+        return original(text, size)
+    monkeypatch.setattr(renderer, "_label", label)
+    renderer.frame(card, 0)
+    assert set(sizes.values()) == {48}
+
+
 @pytest.mark.parametrize("kind,payload", [
     ("task", {"task_id": "a", "title": "T", "status": "running", "progress": 101}),
     ("expression", {"intent": "discovery", "title": "T", "image_path": "ignored.png"}),

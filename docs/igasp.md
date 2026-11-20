@@ -127,9 +127,12 @@ not an outstanding acceptance item. A receiver embedder can pass `priorities`
 to `make_server`.
 Equal-priority sessions favor the most recently updated one. Declared style
 changes the ambient ring geometry; state and mood modulate its movement.
-The current card renderer targets 48 px titles and 32 px supporting text; long
-lines use spare rows before shrinking to fit the projection width. This is the
-current implementation, not a required fixed style for future expressions.
+The current card renderer uses a source header and left-aligned text in a
+uniform font size and line spacing. It targets 48 px, wrapping lines and
+reducing the whole card's font size together when needed; if the card
+still exceeds the field at the minimum size, an ellipsis indicates that content
+was omitted and the complete message remains available in the agent's chat.
+This is the current implementation, not a fixed style for future expressions.
 
 Add **one** output option to the receiver command. Omit `--seconds` for
 continuous operation; Ctrl+C clears and disconnects. Bounded test examples:
