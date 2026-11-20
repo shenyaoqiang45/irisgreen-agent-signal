@@ -8,8 +8,10 @@ or information unsuitable for a shared wall.
 
 Prefer the configured `irisgreen-status` MCP `report_expression` tool with a
 stable session ID. Omit `duration_ms` and `ttl_ms` so the message remains until
-the next expression replaces it. Report only relevant changes, not every token
-or routine tool call. An acknowledgment is not authorization.
+the next expression replaces it in receiver state. The device clears and
+disconnects after five minutes without a successful projection; a new message
+reconnects it. Report only relevant changes, not every token or routine tool
+call. An acknowledgment is not authorization.
 
 Reuse the device connection during the interaction. Do not clear the display
 or disconnect after each message; clear when explicitly requested or at session

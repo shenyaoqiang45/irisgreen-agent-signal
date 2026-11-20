@@ -10,8 +10,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp import types
@@ -22,6 +24,8 @@ from irisgreen_capability import CapabilityRegistry, Runtime
 
 SERVER_NAME = "irisgreen"
 SERVER_VERSION = "0.4.0"
+IDLE_TIMEOUT_SECONDS = 300.0
+logger = logging.getLogger(__name__)
 
 INSTRUCTIONS = """\
 IrisGreen is a pocket MEMS laser projector. These tools let you put light on a real wall.
@@ -32,8 +36,9 @@ private reasoning, or information unsuitable for a shared wall.
 
 Typical flow:
 1. device_connect once per interaction session (pass address when more than one projector is in range). Reuse the connection for subsequent messages; do not disconnect after each one.
-2. project_image to show a picture filling the projector field, project_animation to loop 1 to 10 pictures in order (uploaded in one call, about 3.5 s per frame), or project_point to show a dot at a projector pixel (640x480, origin top-left). Each call replaces what was shown before; do not clear between messages. For a persistent message use seconds=3600, the device limit; continuous renewal requires a running output service.
+2. project_image to show a picture filling the projector field, project_animation to loop 1 to 10 pictures in order (uploaded in one call, about 3.5 s per frame), or project_point to show a dot at a projector pixel (640x480, origin top-left). Each call replaces what was shown before; do not clear between messages.
 3. project_status reports whether light is on. When the user requests clearing or the session ends, call project_clear before device_disconnect. If projection fails, report the error rather than claiming success.
+After five minutes without a successful projection, the server attempts to clear and disconnect. Status queries do not reset this timer. Connect again to project a new message.
 
 There is no camera: you cannot see the wall, so positions are in projector pixels.
 Every result has ok=true, or ok=false with error.code and error.message. The projector emits at most what its firmware allows; the tools only validate coordinates.
@@ -87,6 +92,58 @@ def build_server(runtime: Runtime) -> Server:
     registry = CapabilityRegistry(runtime)
     by_tool = {tool_name(name): name for name in registry.names()}
     tools = build_tools(registry)
+    lock = asyncio.Lock()
+    wake = asyncio.Event()
+    deadline: float | None = None
+    stopping = False
+
+    async def clear_and_disconnect(reason: str) -> None:
+        clear = await registry.call("project.clear", {})
+        if not clear.get("ok"):
+            logger.error("%s clear failed: %s", reason, clear.get("error"))
+        disconnect = await registry.call("device.disconnect", {})
+        if not disconnect.get("ok"):
+            logger.error("%s disconnect failed: %s", reason, disconnect.get("error"))
+
+    async def watch_idle() -> None:
+        nonlocal deadline
+        loop = asyncio.get_running_loop()
+        while not stopping:
+            if deadline is None:
+                await wake.wait()
+                wake.clear()
+                continue
+            remaining = deadline - loop.time()
+            if remaining > 0:
+                try:
+                    await asyncio.wait_for(wake.wait(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    pass
+                wake.clear()
+                continue
+            async with lock:
+                if deadline is None or loop.time() < deadline:
+                    continue
+                deadline = None
+                if runtime.device is not None:
+                    await clear_and_disconnect("Idle")
+
+    @asynccontextmanager
+    async def lifespan(_server):
+        nonlocal deadline, stopping
+        stopping = False
+        if runtime.device is not None and runtime.device.connected:
+            deadline = asyncio.get_running_loop().time() + IDLE_TIMEOUT_SECONDS
+        task = asyncio.create_task(watch_idle())
+        try:
+            yield {}
+        finally:
+            stopping = True
+            wake.set()
+            await task
+            async with lock:
+                if runtime.device is not None and runtime.device.connected:
+                    await clear_and_disconnect("Shutdown")
 
     async def on_list_tools(ctx, params) -> types.ListToolsResult:
         return types.ListToolsResult(tools=tools)
@@ -98,12 +155,25 @@ def build_server(runtime: Runtime) -> Server:
                 "ok": False,
                 "error": {"code": "invalid_argument", "message": f"unknown tool: {params.name}"},
             })
-        return to_call_result(await registry.call(name, params.arguments or {}))
+        nonlocal deadline
+        async with lock:
+            result = await registry.call(name, params.arguments or {})
+            if result.get("ok"):
+                if name == "device.disconnect":
+                    deadline = None
+                    wake.set()
+                elif name in ("project.image", "project.animation", "project.point") or (
+                    name == "device.connect" and not result.get("already_connected")
+                ):
+                    deadline = asyncio.get_running_loop().time() + IDLE_TIMEOUT_SECONDS
+                    wake.set()
+            return to_call_result(result)
 
     return Server(
         SERVER_NAME,
         version=SERVER_VERSION,
         instructions=INSTRUCTIONS,
+        lifespan=lifespan,
         on_list_tools=on_list_tools,
         on_call_tool=on_call_tool,
     )

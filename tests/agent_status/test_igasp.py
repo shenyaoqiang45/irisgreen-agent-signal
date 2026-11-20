@@ -2,9 +2,10 @@ import asyncio
 import json
 import secrets
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import Thread
+from threading import Event, Thread
 
 import pytest
 from mcp import Client, StdioServerParameters
@@ -154,6 +155,68 @@ def test_live_output_reuses_connection_and_replaces_without_clearing(tmp_path, m
 
     with make_server({"a": token}, 0, tmp_path / "out.png") as server:
         asyncio.run(run(server))
+
+
+def test_live_output_idle_does_not_replay_and_new_message_reconnects(tmp_path, monkeypatch):
+    import numpy as np
+    import irisgreen_mcp.server as mcp_server
+    from irisgreen_capability.sim import make_sim_runtime
+    from agent_status import output
+    from visualizer.core.presentation import Card
+    from visualizer.device.mcp_adapter import McpDeviceAdapter
+
+    monkeypatch.setattr(mcp_server, "IDLE_TIMEOUT_SECONDS", 0.6)
+    runtime, rig = make_sim_runtime(data_dir=str(tmp_path))
+    server = mcp_server.build_server(runtime)
+
+    def server_params(adapter):
+        runtime.data_dir = adapter.data_dir
+        return server
+
+    monkeypatch.setattr(McpDeviceAdapter, "_server_params", server_params)
+    frame = np.ones((480, 640), dtype=np.uint8)
+
+    class Receiver:
+        def __init__(self):
+            self.latest = (Card(("first",), 1, 1, until=time.time() + 10), frame)
+            self.stopped = Event()
+
+        def serve_forever(self, poll_interval):
+            self.stopped.wait()
+
+        def shutdown(self):
+            self.stopped.set()
+
+    async def go():
+        receiver = Receiver()
+        task = asyncio.create_task(output.project(receiver, None, True, None))
+
+        async def wait_for(predicate):
+            for _ in range(60):
+                if predicate():
+                    return
+                if task.done():
+                    await task
+                await asyncio.sleep(.05)
+            pytest.fail("timed out waiting for simulated projection")
+
+        try:
+            await wait_for(lambda: rig.world.mask.any())
+            await wait_for(lambda: not rig.transport.connected and not rig.world.mask.any())
+            uploads = len(rig.world.uploads)
+            await asyncio.sleep(1.2)
+            assert len(rig.world.uploads) == uploads
+            assert not rig.transport.connected
+            receiver.latest = (Card(("second",), 1, 2, until=time.time() + 10), frame)
+            await wait_for(lambda: rig.transport.connected and rig.world.mask.any())
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert not rig.transport.connected
+        assert not rig.world.mask.any()
+
+    asyncio.run(go())
 
 
 def test_card_layout_spreads_content_and_keeps_masks_inside_field(monkeypatch):

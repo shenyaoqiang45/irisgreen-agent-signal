@@ -3,6 +3,8 @@
 Follow the IrisGreen reporting instructions in `AGENTS.md` for this repository:
 proactively send important discoveries, blockers, decisions requiring user input,
 and meaningful completions to IG. Prefer `report_expression` through the configured
-`irisgreen-status` MCP service; keep messages persistent and reuse the device
-connection. Never project secrets or private reasoning. If the service or device
-is unavailable, tell the user in chat instead of claiming a projection succeeded.
+`irisgreen-status` MCP service; keep messages persistent in receiver state and
+reuse the device connection. The display clears and disconnects after five
+minutes without a successful projection. Never project secrets or private
+reasoning. If the service or device is unavailable, tell the user in chat instead
+of claiming a projection succeeded.

@@ -107,33 +107,25 @@ class McpDeviceAdapter:
     async def connect(self) -> dict[str, Any]:
         from mcp import Client
 
-        if self._connected and self._client is not None:
-            out = {"ok": True, "already_connected": True, **self.status()}
-            self.last_result = out
-            return out
         try:
+            if self._connected and self._client is not None:
+                return await self._connect_device()
             params = self._server_params()
             self._cm = Client(params)
             self._client = await self._cm.__aenter__()
             tools = {t.name for t in (await self._client.list_tools()).tools}
-            needed = {"device_connect", "project_image", "project_clear", "device_disconnect"}
+            needed = {
+                "device_connect", "device_get_status", "project_image",
+                "project_clear", "device_disconnect",
+            }
             missing = needed - tools
             if missing:
                 raise RuntimeError(f"MCP missing tools: {sorted(missing)}")
-            args: dict[str, Any] = {}
-            if self.address:
-                args["address"] = self.address
-            result = await self._client.call_tool("device_connect", args)
-            data = _parse_tool_result(result)
-            if getattr(result, "is_error", False):
-                data = {"ok": False, "error": {"message": str(data)}}
-            self.last_result = data
+            data = await self._connect_device()
             if data.get("ok"):
                 self._connected = True
-                self.last_error = ""
             else:
                 self._connected = False
-                self.last_error = str((data.get("error") or {}).get("message") or data)
                 await self._close_client()
             return data
         except Exception as exc:  # noqa: BLE001
@@ -142,6 +134,18 @@ class McpDeviceAdapter:
             self.last_result = {"ok": False, "error": {"message": repr(exc)}}
             await self._close_client()
             return self.last_result
+
+    async def _connect_device(self) -> dict[str, Any]:
+        args: dict[str, Any] = {}
+        if self.address:
+            args["address"] = self.address
+        result = await self._client.call_tool("device_connect", args)
+        data = _parse_tool_result(result)
+        if getattr(result, "is_error", False) and data.get("ok") is not False:
+            data = {"ok": False, "error": {"message": str(data)}}
+        self.last_result = data
+        self.last_error = "" if data.get("ok") else str((data.get("error") or {}).get("message") or data)
+        return data
 
     def _write_mask_png(self, mask: np.ndarray) -> str:
         arr = np.asarray(mask)
@@ -162,11 +166,14 @@ class McpDeviceAdapter:
             return out
         try:
             name = self._write_mask_png(mask)
-            result = await self._client.call_tool(
-                "project_image",
-                {"image_path": name, "mode": self.mode, "seconds": float(seconds)},
-            )
+            args = {"image_path": name, "mode": self.mode, "seconds": float(seconds)}
+            result = await self._client.call_tool("project_image", args)
             data = _parse_tool_result(result)
+            if (data.get("error") or {}).get("code") == "not_connected":
+                data = await self._connect_device()
+                if data.get("ok"):
+                    result = await self._client.call_tool("project_image", args)
+                    data = _parse_tool_result(result)
             if getattr(result, "is_error", False) and data.get("ok") is not False:
                 data = {"ok": False, "error": {"message": str(data)}}
             self.last_result = data
@@ -189,6 +196,16 @@ class McpDeviceAdapter:
         try:
             result = await self._client.call_tool("project_clear", {})
             data = _parse_tool_result(result)
+            if (data.get("error") or {}).get("code") == "not_connected":
+                status = _parse_tool_result(await self._client.call_tool("device_get_status", {}))
+                if not status.get("ok"):
+                    data = status
+                elif status.get("projecting") is False:
+                    data = {"ok": True, "already_clear": True}
+                else:
+                    data = await self._connect_device()
+                    if data.get("ok"):
+                        data = _parse_tool_result(await self._client.call_tool("project_clear", {}))
             self.last_result = data
             return data
         except Exception as exc:  # noqa: BLE001

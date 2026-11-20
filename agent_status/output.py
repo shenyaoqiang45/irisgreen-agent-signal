@@ -22,7 +22,6 @@ async def project(server, address, simulate, seconds):
         try:
             end = time.monotonic() + seconds if seconds is not None else float("inf")
             previous = None
-            renew = 0.0
             while time.monotonic() < end:
                 if not thread.is_alive():
                     raise RuntimeError("receiver stopped")
@@ -33,11 +32,11 @@ async def project(server, address, simulate, seconds):
                         if previous is not None:
                             checked("clear", await device.clear())
                         previous = None
-                    elif card.until > time.time() and (card != previous or time.monotonic() >= renew):
+                    elif card.until > time.time() and card != previous:
                         hold = min(3600.0, end - time.monotonic(), card.until - time.time())
                         if hold >= 0.1:
                             checked("project", await device.push_frame(frame, seconds=hold))
-                            previous, renew = card, time.monotonic() + max(1.0, hold - 30)
+                            previous = card
                 await asyncio.sleep(.2)
         finally:
             try:

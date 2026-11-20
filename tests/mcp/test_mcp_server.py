@@ -6,6 +6,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 from mcp import Client, StdioServerParameters
 
 from irisgreen_capability.sim import make_sim_runtime
@@ -96,6 +97,121 @@ def test_agent_flow_connect_project_image_and_clear(tmp_path):
     assert structured(shown)["lit_pixels"] > 0 and lit.any()
     assert structured(status)["projecting"] is True
     assert not rig.world.mask.any()
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("project_point", {"x": 300, "y": 200}),
+    ("project_image", {"image_path": "frame.png"}),
+    ("project_animation", {"frames": [{"image_path": "frame.png"}]}),
+])
+def test_idle_timeout_clears_disconnects_and_resets_only_on_projection(
+    tmp_path, monkeypatch, tool, args
+):
+    import irisgreen_mcp.server as module
+
+    monkeypatch.setattr(module, "IDLE_TIMEOUT_SECONDS", 0.8)
+    server, runtime, rig = sim_server(tmp_path)
+    cv2.imwrite(str(tmp_path / "frame.png"), np.full((480, 640), 255, np.uint8))
+
+    async def go():
+        async with Client(server) as client:
+            assert structured(await client.call_tool("device_connect", {}))["ok"]
+            assert structured(await client.call_tool("project_point", {"x": 100, "y": 100}))["ok"]
+            await asyncio.sleep(.45)
+            assert structured(await client.call_tool("device_connect", {}))["already_connected"]
+            assert structured(await client.call_tool(tool, args))["ok"]
+            await asyncio.sleep(.45)
+            assert structured(await client.call_tool("device_get_status", {}))["connected"]
+            assert rig.world.mask.any()
+            invalid = await client.call_tool("project_point", {"x": -1, "y": 200})
+            assert invalid.is_error
+            await asyncio.sleep(.45)
+            status = structured(await client.call_tool("device_get_status", {}))
+            assert not status["connected"]
+            assert not status["projecting"]
+            assert not rig.world.mask.any()
+            assert structured(await client.call_tool("device_connect", {}))["connected"]
+            assert structured(await client.call_tool("project_point", {"x": 320, "y": 240}))["ok"]
+
+    asyncio.run(go())
+
+
+def test_idle_shutdown_waits_for_inflight_projection(tmp_path, monkeypatch):
+    import irisgreen_mcp.server as module
+
+    monkeypatch.setattr(module, "IDLE_TIMEOUT_SECONDS", 0.3)
+    server, runtime, rig = sim_server(tmp_path)
+
+    async def go():
+        async with Client(server) as client:
+            assert structured(await client.call_tool("device_connect", {}))["ok"]
+            original = runtime.device.show_mask
+
+            async def slow_show(mask, seconds=3600.0):
+                await asyncio.sleep(.4)
+                await original(mask, seconds)
+
+            monkeypatch.setattr(runtime.device, "show_mask", slow_show)
+            assert structured(await client.call_tool("project_point", {"x": 320, "y": 240}))["ok"]
+            assert structured(await client.call_tool("device_get_status", {}))["connected"]
+            assert rig.world.mask.any()
+
+    asyncio.run(go())
+
+
+def test_idle_timeout_starts_at_connection_and_repeated_connect_does_not_extend(tmp_path, monkeypatch):
+    import irisgreen_mcp.server as module
+
+    monkeypatch.setattr(module, "IDLE_TIMEOUT_SECONDS", 0.6)
+    server, runtime, _ = sim_server(tmp_path)
+
+    async def go():
+        async with Client(server) as client:
+            assert structured(await client.call_tool("device_connect", {}))["ok"]
+            await asyncio.sleep(.35)
+            assert structured(await client.call_tool("device_connect", {}))["already_connected"]
+            await asyncio.sleep(.35)
+            assert not structured(await client.call_tool("device_get_status", {}))["connected"]
+
+    asyncio.run(go())
+
+
+def test_server_shutdown_clears_and_disconnects(tmp_path):
+    server, runtime, rig = sim_server(tmp_path)
+
+    async def go():
+        async with Client(server) as client:
+            assert structured(await client.call_tool("device_connect", {}))["ok"]
+            assert structured(await client.call_tool("project_point", {"x": 320, "y": 240}))["ok"]
+            assert rig.world.mask.any()
+        assert not runtime.device.connected
+        assert not rig.world.mask.any()
+
+    asyncio.run(go())
+
+
+def test_idle_clear_failure_is_reported_and_disconnect_attempted(tmp_path, monkeypatch, caplog):
+    import irisgreen_mcp.server as module
+
+    monkeypatch.setattr(module, "IDLE_TIMEOUT_SECONDS", 0.2)
+    server, runtime, _ = sim_server(tmp_path)
+
+    async def go():
+        async with Client(server) as client:
+            assert structured(await client.call_tool("device_connect", {}))["ok"]
+
+            async def fail_clear():
+                raise RuntimeError("clear failed")
+
+            monkeypatch.setattr(runtime.device, "clear", fail_clear)
+            for _ in range(25):
+                await asyncio.sleep(.08)
+                if not structured(await client.call_tool("device_get_status", {}))["connected"]:
+                    break
+            assert not runtime.device.connected
+            assert "Idle clear failed" in caplog.text
+
+    asyncio.run(go())
 
 
 def test_launch_script_needs_no_pythonpath(tmp_path):

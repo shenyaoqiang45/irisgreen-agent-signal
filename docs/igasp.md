@@ -150,13 +150,18 @@ transition. It attempts clear and disconnect on shutdown. Confirm content,
 orientation, readability and final darkness **by eye**; a transport receipt
 does not verify any of these.
 
-The running receiver connects once and keeps its MCP client and device session
-for subsequent reports. It uploads a replacement without first clearing the
-display. An idle Bluetooth link may still drop independently; the existing
-device layer reconnects if needed before an upload. Hardware playback is capped
-at one hour, so a running receiver renews a persistent frame before it expires.
-Stopping the receiver intentionally clears and disconnects. Agent-facing HTTP
-and MCP acknowledgments confirm receipt, not that projection succeeded.
+The running receiver keeps its MCP client and uploads replacements without
+first clearing the display. The device MCP server starts a five-minute idle
+timer at connection and resets it after each successful projection, not on
+status queries, failed projections or repeated connect calls. On expiry it
+attempts to clear and disconnect, logging failures to stderr. The receiver does
+not replay an old card to keep the device awake; a subsequent new card
+reconnects and projects. The expression remains in the receiver's state until
+replaced or cleared even though its physical display has gone dark. Stopping
+the receiver attempts to clear and disconnect. A crashed or forcibly terminated
+process cannot guarantee cleanup. Restart existing device MCP processes to
+load the timer. Agent-facing HTTP and MCP acknowledgments confirm receipt, not
+that projection succeeded.
 
 **2026-11-19 verification:** Actual device MCP connected to
 `20:6E:F1:81:71:62`; manufacturer `AINSTEC`, firmware `36130326071700`,
