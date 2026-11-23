@@ -13,11 +13,13 @@ from pathlib import Path
 from PIL import Image
 
 from visualizer.renderer.card import CardRenderer
+from .page_summary import open_page
 from .presentation import AgentPresentation
 from .receiver import Receiver, Rejected
 
 EVENTS = "/api/v1/agent/events"
 SNAPSHOT = "/api/v1/agent/snapshot"
+PAGE = "/api/v1/page/open"
 LIMIT = 65536
 
 
@@ -36,7 +38,7 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
 
         def do_POST(self):
             try:
-                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read"):
+                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE):
                     raise Rejected(404, "unknown endpoint")
                 auth = self.headers.get("Authorization", "").encode("latin1")
                 agent = next((a for a, t in credentials.items()
@@ -57,6 +59,8 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
                     if not isinstance(event, dict) or not isinstance(event.get("session_id"), str):
                         raise Rejected(400, "expected session_id")
                     data = {"ok": True, "snapshot": receiver.snapshot(agent, event["session_id"])}
+                elif self.path == PAGE:
+                    data = open_page(receiver, agent, event)
                 else:
                     data = receiver.receive(event, agent)
                 code = 200

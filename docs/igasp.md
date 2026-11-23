@@ -81,6 +81,12 @@ For example:
 ```
 
 HTTP accepts JSON POSTs at `127.0.0.1:8171` with `Authorization: Bearer <token>`.
+`/api/v1/page/open` accepts `{"url","title","text"}` for the foreground page the
+user just opened. The receiver keeps the opening sentence, at most 160
+characters, as one `agent.expression` in session `browser`. The next page
+replaces it. Give this caller its own credential, for example `"browser"`.
+The extension in `extensions/page-glance` posts that body when a page finishes
+loading in the active tab.
 `/api/v1/agent/events` accepts any IGASP event. `/api/v1/agent/snapshot` accepts
 only snapshot envelopes. POST `{"session_id":"s1"}` to `/api/v1/agent/snapshot/read`
 to export the authenticated agent's current session as a replayable snapshot.

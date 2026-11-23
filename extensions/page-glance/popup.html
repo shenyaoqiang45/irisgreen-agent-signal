@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>打开即总结</title>
+<style>
+  body { font: 14px sans-serif; width: 280px; margin: 12px; color: #17201c; }
+  label { display: block; margin: 10px 0 4px; }
+  input[type="password"], input[type="text"] { width: 100%; box-sizing: border-box; }
+  button { margin-top: 12px; }
+  p { min-height: 1.2em; white-space: pre-wrap; }
+</style>
+<label>接收器令牌</label>
+<input id="token" type="password" autocomplete="off">
+<label>端口</label>
+<input id="port" type="text" inputmode="numeric">
+<label><input id="enabled" type="checkbox"> 打开页面就总结</label>
+<button id="save">保存</button>
+<p id="state"></p>
+<p id="summary"></p>
+<script src="popup.js"></script>

@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "IrisGreen 打开即总结",
+  "version": "1.6.0",
+  "description": "把当前打开的网页收成一句，投到 IrisGreen。",
+  "permissions": ["webNavigation", "storage", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>", "http://127.0.0.1/*"],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }],
+  "action": {
+    "default_title": "打开即总结",
+    "default_popup": "popup.html"
+  }
+}
