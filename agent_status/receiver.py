@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from visualizer.event_bus import Event, EventBus
 
+from .image import image_mask
 from .protocol import envelope, parse_time, validator
 
 
@@ -59,6 +60,21 @@ class Receiver:
                 "expires": start + ttl, "display_until": start + min(ttl, p.get("duration_ms", inf) / 1000),
                 "revision": self.sequence + 1}
 
+    def _require_images(self, kind, payload):
+        if kind == "agent.expression":
+            blobs = [payload.get("image_base64")]
+        elif kind == "agent.snapshot":
+            blobs = [n["expression"].get("image_base64") for n in payload["expressions"]]
+        else:
+            return
+        for blob in blobs:
+            if not blob:
+                continue
+            try:
+                image_mask(blob)
+            except ValueError as exc:
+                raise Rejected(400, str(exc)) from exc
+
     def snapshot(self, agent, session):
         self.prune()
         s = self.sessions.get((agent, session))
@@ -85,6 +101,7 @@ class Receiver:
                 raise Rejected(409, "event_id already used")
             return {**receipt, "duplicate": True}
         p = deepcopy(event["payload"])
+        self._require_images(kind, p)
         self.prune()
         s = self.sessions.get(key)
         if s is None:

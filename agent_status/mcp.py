@@ -64,7 +64,9 @@ def build_server(agent, token, port):
     return Server("irisgreen-agent-status", version="1.0", on_call_tool=call, on_list_tools=listing,
                   instructions="Proactively report important discoveries, blockers, requests for "
                   "user input or approval, and meaningful completions using report_expression; "
-                  "do not wait to be asked. Do not project secrets or sensitive information. "
+                  "do not wait to be asked. An expression may include one image_base64 "
+                  "(PNG, JPEG, BMP, or WebP); the receiver fills the field with that image. "
+                  "Do not project secrets or sensitive information. "
                   "If reporting fails, tell the user; a receipt does not prove projection. "
                   "Report only your self-declared profile, status and important changes. "
                   "Use a stable session_id and task_id. For persistent messages omit duration_ms and "

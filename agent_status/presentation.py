@@ -2,6 +2,8 @@ from zlib import crc32
 
 from visualizer.core.presentation import Card, select
 
+from .image import image_mask
+
 
 PRIORITIES = {"urgent": 0, "attention": 1, "expression": 2, "task": 3, "ambient": 4, "music": 5}
 
@@ -45,8 +47,10 @@ class AgentPresentation:
             for n in s.expressions.values():
                 level = ("urgent" if n.get("urgency") == "urgent" else
                          "attention" if n["intent"] == "approval_required" else "expression")
+                image = image_mask(n["image_base64"]) if n.get("image_base64") else b""
                 cards.insert(0, Card((source, n["title"], n["intent"], n.get("message", ""), n.get("icon", "")),
-                                     self.priorities[level], n["revision"], n["display_until"], accent=accent))
+                                     self.priorities[level], n["revision"], n["display_until"], accent=accent,
+                                     image=image))
         self.cards = cards
 
     def current(self, other_cards=()):

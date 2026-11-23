@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import io
 import json
 import secrets
 import sys
@@ -287,6 +289,49 @@ def test_expression_uses_uniform_font_size(monkeypatch):
     assert set(sizes.values()) == {48}
 
 
+def _png_b64():
+    image = Image.new("L", (2, 1))
+    image.putpixel((0, 0), 255)
+    image.putpixel((1, 0), 0)
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def test_expression_image_fills_the_field_and_round_trips():
+    from agent_status.image import image_mask
+    from visualizer.renderer.card import CardRenderer
+
+    encoded = _png_b64()
+    payload = {"intent": "discovery", "title": "Shot", "image_base64": encoded}
+    receiver = Receiver()
+    view = AgentPresentation(receiver)
+    receiver.receive(envelope("agent.expression", "a", "s", payload), "a")
+    card = view.current()
+    assert card.lines[1] == "Shot" and card.image == image_mask(encoded)
+    frame = CardRenderer().frame(card, 0)
+    assert frame.shape == (480, 640) and frame.tobytes() == card.image
+    assert int(frame[:, 0].sum()) > int(frame[:, -1].sum())
+    snapshot = receiver.snapshot("a", "s")
+    assert snapshot["payload"]["expressions"][0]["expression"]["image_base64"] == encoded
+    restored = Receiver()
+    restored_view = AgentPresentation(restored)
+    restored.receive(snapshot, "a")
+    assert restored_view.current().image == card.image
+
+
+def test_undecodable_or_oversized_image_is_rejected():
+    receiver = Receiver()
+    bad = base64.b64encode(b"not an image").decode()
+    with pytest.raises(Rejected, match="image"):
+        receiver.receive(envelope("agent.expression", "a", "s",
+                                  {"intent": "discovery", "title": "T", "image_base64": bad}), "a")
+    assert not receiver.sessions
+    huge = envelope("agent.expression", "a", "s",
+                    {"intent": "discovery", "title": "T", "image_base64": "A" * 60004})
+    assert not validator.is_valid(huge)
+
+
 @pytest.mark.parametrize("kind,payload", [
     ("task", {"task_id": "a", "title": "T", "status": "running", "progress": 101}),
     ("expression", {"intent": "discovery", "title": "T", "image_path": "ignored.png"}),
@@ -315,7 +360,10 @@ def test_stdio_and_http_share_authenticated_receiver(tmp_path):
                     args=[str(ROOT / "mcp/irisgreen-agent-status/launch.py")],
                     env={"IGASP_AGENT": "a", "IGASP_TOKEN": token, "IGASP_PORT": str(port)})
                 async with Client(params) as client:
-                    names = {t.name for t in (await client.list_tools()).tools}
+                    tools = (await client.list_tools()).tools
+                    names = {t.name for t in tools}
+                    expression = next(t for t in tools if t.name == "report_expression")
+                    assert "image_base64" in expression.input_schema["$defs"]["expression"]["properties"]
                     assert "report_snapshot" in names and "project_image" not in names
                     assert "Proactively report important discoveries" in client.instructions
                     assert "a receipt does not prove projection" in client.instructions

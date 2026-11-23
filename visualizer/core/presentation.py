@@ -12,6 +12,7 @@ class Card:
     until: float = inf
     pulse: float = 0.0
     accent: int = 0
+    image: bytes = b""
 
 
 def select(cards, now):

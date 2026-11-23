@@ -92,7 +92,7 @@ and deduplication are in memory. The protocol is not a durable event log.
 | `agent.profile`, `agent.personality` | `report_profile`, `report_personality` | Replace profile or just personality across this agent's sessions. MBTI/custom style is self-declared. |
 | `agent.status`, `agent.status.clear` | `report_status`, `clear_status` | Patch only supplied fields; `mood:null` clears mood without changing state. Clear removes the whole status, not tasks. |
 | `agent.task` | `report_task` | Upsert by task ID. Each report replaces the task. Progress is a supplied percentage (0–100), not an estimate from elapsed time. Terminal tasks leave the active set and briefly display their outcome. |
-| `agent.expression` | `report_expression` | ID defaults to event ID (returned in receipt); supplying an expression ID replaces that notice. |
+| `agent.expression` | `report_expression` | ID defaults to event ID (returned in receipt); supplying an expression ID replaces that notice. Optional `image_base64` is one PNG, JPEG, BMP, or WebP (standard base64, at most 60000 characters) shown in place of the text card. |
 | `agent.expression.ack`, `agent.expression.clear` | `ack_expression`, `clear_expression` | Remove that notification in that session. |
 | `agent.snapshot` | `report_snapshot` | Atomically replace one session's status, active tasks, live expressions and the agent's shared profile. Restored notices retain their original timestamp. |
 | `agent.session.started`, `agent.session.ended` | `start_session`, `end_session` | Sessions can also start on first report. Ending drops transient state but retains profile. |
@@ -133,6 +133,7 @@ reducing the whole card's font size together when needed; if the card
 still exceeds the field at the minimum size, an ellipsis indicates that content
 was omitted and the complete message remains available in the agent's chat.
 This is the current implementation, not a fixed style for future expressions.
+An expression that includes `image_base64` is scaled to fill the 640×480 field and thresholded at 127, so the wall shows that picture. The same 64 KiB event limit applies; the field cap keeps one image inside it. A path is not an input.
 
 Add **one** output option to the receiver command. Omit `--seconds` for
 continuous operation; Ctrl+C clears and disconnects. Bounded test examples:

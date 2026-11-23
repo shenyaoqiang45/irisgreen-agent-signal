@@ -45,6 +45,9 @@
     "expression": {"type": "object", "additionalProperties": false, "required": ["intent", "title"], "properties": {
       "expression_id": {"$ref": "#/$defs/id"}, "intent": {"enum": ["discovery", "idea", "warning", "blocked", "approval_required", "user_input_required", "completed", "milestone"]},
       "title": {"$ref": "#/$defs/text"}, "message": {"$ref": "#/$defs/text"}, "icon": {"$ref": "#/$defs/id"},
+      "image_base64": {"type": "string", "minLength": 4, "maxLength": 60000,
+        "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+        "description": "One PNG, JPEG, BMP, or WebP, standard base64. The receiver scales it to fill the 640x480 field and shows it as 1-bit light. Omit for a text card. The 60000-character cap keeps one image inside the 64 KiB event body."},
       "urgency": {"enum": ["low", "normal", "urgent"]}, "duration_ms": {"type": "integer", "minimum": 1, "maximum": 3600000},
       "ttl_ms": {"type": "integer", "minimum": 1, "maximum": 86400000}
     }},

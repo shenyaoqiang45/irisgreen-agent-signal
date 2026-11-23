@@ -1,6 +1,8 @@
 import math
 from functools import lru_cache
 
+import numpy as np
+
 from visualizer.renderer import Renderer
 from visualizer.renderer.draw import draw_ring
 from visualizer.renderer.fonts import load_font
@@ -84,6 +86,9 @@ class CardRenderer(Renderer):
         frame = self.empty_frame()
         if card is None:
             return frame
+        if card.image:
+            return np.frombuffer(card.image, dtype=np.uint8).reshape(
+                self.display.height, self.display.width).copy()
         x = 20
         has_source = bool(card.lines and card.lines[0])
         groups = self._content(card.lines[1:], include_source=has_source)
