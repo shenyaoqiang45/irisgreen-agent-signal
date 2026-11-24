@@ -14,12 +14,12 @@ message remains until the next expression replaces it in receiver state. The
 device clears and disconnects after five minutes without a successful
 projection; a new message reconnects it. An acknowledgment is not authorization.
 
-If `report_expression` is unavailable, project the same summary with the device
-after `device_connect`, and reuse that connection. Do not clear the display or
-disconnect after each message; clear when explicitly requested or at session
-shutdown. If the reporting service or device is unavailable, say so in chat;
-do not claim a message was projected based only on an HTTP/MCP receipt. Follow
-the operator's device safety instructions. See `docs/igasp.md` for setup.
+`report_expression` speaks HTTP only. Do not start the device service or call
+`device_connect` to deliver the summary. For now only the IGASP receiver may
+launch that service and hold Bluetooth. If the reporting service is
+unavailable, say so in chat; do not claim a message was projected based only
+on an HTTP/MCP receipt. Follow the operator's device safety instructions. See
+`docs/igasp.md` for setup.
 
 Status cards do not need a fixed visual style or template. Choose presentation
 appropriate to the message, agent, and device capabilities while keeping it

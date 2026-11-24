@@ -1,0 +1,23 @@
+---
+description: Only the IGASP receiver may launch the IrisGreen device service
+alwaysApply: true
+---
+
+# One device service
+
+Windows allows one BLE session to the projector. A second
+`mcp/irisgreen-mcp-server/launch.py` aborts the link.
+
+For now, only the IGASP receiver (`python -m agent_status.http`) may start
+the device service and hold Bluetooth. The receiver starts its own child.
+
+Do not start `launch.py` yourself. Do not call its tools: `device_connect`,
+`device_disconnect`, `device_get_status`, `project_image`, `project_animation`,
+`project_point`, `project_clear`, `project_status`.
+
+Do not put an `irisgreen` device server back into `.cursor/mcp.json`,
+`.vscode/mcp.json`, or `.mcp.json`.
+
+Status reports use `irisgreen-status` `report_expression`, which is HTTP only.
+If that service is down, say so in chat. The receiver being down is not a
+reason to launch a device service.

@@ -1,15 +1,3 @@
 {
-  // WorkBuddy / CodeBuddy project-level MCP config. Set IRISGREEN_REPO to the clone path if it is not this one.
-  "mcpServers": {
-    "irisgreen": {
-      "type": "stdio",
-      "command": "${IRISGREEN_REPO:-E:/2027/irisgreen-ai-physical-interface}/.venv/Scripts/python.exe",
-      "args": [
-        "${IRISGREEN_REPO:-E:/2027/irisgreen-ai-physical-interface}/mcp/irisgreen-mcp-server/launch.py",
-        "--address",
-        "20:6E:F1:81:71:62"
-      ],
-      "description": "IrisGreen laser projector: project images and dots, clear"
-    }
-  }
+  "mcpServers": {}
 }

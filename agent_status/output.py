@@ -35,8 +35,14 @@ async def project(server, address, simulate, seconds):
                     elif card.until > time.time() and card != previous:
                         hold = min(3600.0, end - time.monotonic(), card.until - time.time())
                         if hold >= 0.1:
-                            checked("project", await device.push_frame(frame, seconds=hold))
-                            previous = card
+                            result = await device.push_frame(frame, seconds=hold)
+                            if not result.get("ok"):
+                                await device.connect()
+                                result = await device.push_frame(frame, seconds=hold)
+                            if result.get("ok"):
+                                previous = card
+                            else:
+                                await asyncio.sleep(2)
                 await asyncio.sleep(.2)
         finally:
             try:
