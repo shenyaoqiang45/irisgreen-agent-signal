@@ -9,9 +9,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-_SDK = Path(__file__).resolve().parents[1] / "sdk" / "capability-sdk"
-if str(_SDK) not in sys.path:
-    sys.path.insert(0, str(_SDK))
+for _sdk in ("ble-protocol-sdk", "capability-sdk"):
+    _path = str(Path(__file__).resolve().parents[1] / "sdk" / _sdk)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from irisgreen_capability.render import binarize
 from visualizer.renderer import FIELD_HEIGHT, FIELD_WIDTH

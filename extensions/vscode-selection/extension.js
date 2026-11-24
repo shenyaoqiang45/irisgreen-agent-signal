@@ -75,16 +75,20 @@ function credential(config) {
 }
 
 async function fetchTranslation(text) {
-  const edge = await request("https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans", {
+  const edge = await request("https://edge.microsoft.com/translate/translatetext?to=zh-Hans", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify([text])
   });
-  const line = edge && edge[0] && edge[0].translations && edge[0].translations[0] && edge[0].translations[0].text;
+  const hit = edge && edge[0];
+  const detected = hit && hit.detectedLanguage && hit.detectedLanguage.language;
+  if (detected && /^zh\b/i.test(detected)) return "";
+  const line = hit && hit.translations && hit.translations[0] && hit.translations[0].text;
   if (line && String(line).trim()) return String(line).trim();
   const backup = await request(
-    "https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=" + encodeURIComponent(text));
-  return ((backup && backup.responseData && backup.responseData.translatedText) || "").trim();
+    "https://api.mymemory.translated.net/get?langpair=autodetect|zh-CN&q=" + encodeURIComponent(text));
+  const fallback = ((backup && backup.responseData && backup.responseData.translatedText) || "").trim();
+  return fallback && fallback !== text ? fallback : "";
 }
 
 function request(url, options = {}) {

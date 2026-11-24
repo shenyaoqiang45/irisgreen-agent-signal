@@ -1,3 +1,4 @@
+import http.client
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,3 +27,13 @@ def envelope(kind, agent, session, payload):
     return {"protocol": "IGASP", "version": "1.0", "event_id": uuid4().hex,
             "timestamp": datetime.now(timezone.utc).isoformat(), "type": kind,
             "agent_id": agent, "session_id": session, "payload": payload}
+
+
+def send(event, token, port):
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=4)
+    try:
+        connection.request("POST", "/api/v1/agent/events", json.dumps(event),
+                           {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        return json.load(connection.getresponse())
+    finally:
+        connection.close()

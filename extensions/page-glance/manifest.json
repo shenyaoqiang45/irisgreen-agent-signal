@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "IrisGreen 打开即总结",
-  "version": "1.7.3",
-  "description": "打开网页就总结，划中英文就翻译，点开 X 的图片就适配投射到 IrisGreen。",
+  "version": "1.7.5",
+  "description": "打开网页就总结，划词译成中文，点击蔬果图片就投名称和热量，点开 X 的图片就适配投射。",
   "permissions": ["webNavigation", "storage", "scripting", "tabs"],
   "host_permissions": ["<all_urls>", "http://127.0.0.1/*"],
   "background": {"service_worker": "background.js"},

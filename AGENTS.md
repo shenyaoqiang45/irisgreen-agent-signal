@@ -14,12 +14,20 @@ message remains until the next expression replaces it in receiver state. The
 device clears and disconnects after five minutes without a successful
 projection; a new message reconnects it. An acknowledgment is not authorization.
 
-`report_expression` speaks HTTP only. Do not start the device service or call
+If that tool is not available in your session, send the same summary from a
+shell with the repository's interpreter, under your own identity (`cursor`,
+`codex` or `copilot`):
+
+```text
+.venv/Scripts/python.exe -m agent_status.report --agent <identity> --session <id> "<title>" "<body>"
+```
+
+Both paths speak HTTP only. Do not start the device service or call
 `device_connect` to deliver the summary. For now only the IGASP receiver may
-launch that service and hold Bluetooth. If the reporting service is
-unavailable, say so in chat; do not claim a message was projected based only
-on an HTTP/MCP receipt. Follow the operator's device safety instructions. See
-`docs/igasp.md` for setup.
+launch that service and hold Bluetooth. If neither path is accepted, say so in
+chat; do not claim a message was projected based only on an HTTP/MCP receipt.
+Follow the operator's device safety instructions. `python -m agent_status.setup`
+registers the tool and the identities; see `docs/igasp.md`.
 
 Status cards do not need a fixed visual style or template. Choose presentation
 appropriate to the message, agent, and device capabilities while keeping it

@@ -34,6 +34,15 @@ python examples/image-projection/main.py --simulate
 
 这个示例验证的是**设备输出**；它不会连接真实 Agent，也不会出光。要接入设备 MCP，请看[客户端配置与真机操作](mcp/irisgreen-mcp-server/README.md)。要了解从 BLE 到投影的验证边界，请看[硬件验收记录](docs/hardware-verification.md)。
 
+**接入你的 Agent：** 一条命令把上报服务注册到 Cursor、Codex 和 VS Code Copilot，每个客户端各用自己的身份，令牌只存在本机用户目录里：
+
+```shell
+python -m agent_status.setup
+python -m agent_status.http --preview irisgreen_data/status.png
+```
+
+第二条命令启动接收器，默认只生成预览图、不出光。重新加载客户端后，Agent 就能用 `report_expression` 上报；细节见 [IGASP 说明](docs/igasp.md)。
+
 ## 一条明确的边界
 
 这个仓库只做 **Agent 与人的物理交互**。音乐可视化、歌词、娱乐播放和通用投影应用不在路线图里。协议、渲染器和设备 SDK 留在这里，是为了让 Agent 的一句重要消息可靠地到达你面前。

@@ -1,5 +1,6 @@
 """Agent-facing stdio bridge; unlike the device MCP this exposes no hardware tools."""
 
+import argparse
 import asyncio
 import http.client
 import json
@@ -7,9 +8,11 @@ import os
 
 from mcp import types
 from mcp.server.lowlevel import Server
+from mcp.server.runner import serve_loop
 from mcp.server.stdio import stdio_server
 
-from .protocol import SCHEMA, envelope
+from .credentials import resolve
+from .protocol import SCHEMA, envelope, send
 
 TOOLS = {
     **{f"report_{name}": (f"agent.{name}", name)
@@ -22,17 +25,7 @@ TOOLS = {
 }
 
 
-def send(event, token, port):
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=4)
-    try:
-        connection.request("POST", "/api/v1/agent/events", json.dumps(event),
-                           {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-        return json.load(connection.getresponse())
-    finally:
-        connection.close()
-
-
-def build_server(agent, token, port):
+def build_server(agent):
     tools = []
     for name, (_, ref) in TOOLS.items():
         props = {"session_id": {"$ref": "#/$defs/id"}}
@@ -55,8 +48,9 @@ def build_server(agent, token, port):
             session = args["session_id"]
             payload = ({"expression_id": args["expression_id"]} if key == "target" else
                        args[key] if key else {})
+            _, token, port = resolve(agent)
             result = await asyncio.to_thread(send, envelope(kind, agent, session, payload), token, port)
-        except (KeyError, OSError, http.client.HTTPException, ValueError) as exc:
+        except (LookupError, OSError, http.client.HTTPException, ValueError) as exc:
             result = {"ok": False, "error": str(exc)}
         return types.CallToolResult(content=[types.TextContent(type="text", text=json.dumps(result))],
                                     structured_content=result, is_error=not result["ok"])
@@ -76,11 +70,21 @@ def build_server(agent, token, port):
                   "reasoning, or treat a notification acknowledgment as approval to act.")
 
 
-async def main():
-    server = build_server(os.environ["IGASP_AGENT"], os.environ["IGASP_TOKEN"],
-                          int(os.environ.get("IGASP_PORT", 8171)))
-    async with stdio_server() as (read, write):
-        await server.run(read, write, server.create_initialization_options())
+async def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--agent", default=os.environ.get("IGASP_AGENT"),
+                        help="reporting identity (default: IGASP_AGENT). Its token is IGASP_TOKEN, "
+                             "or the one python -m agent_status.setup stored")
+    agent = parser.parse_args(argv).agent
+    if not agent:
+        parser.error("pass --agent or set IGASP_AGENT")
+    server = build_server(agent)
+    async with stdio_server() as (read, write), server.lifespan(server) as state:
+        # Handshake era only. Server.run also serves 2026-07-28, and then refuses
+        # `initialize` once it has answered server/discover; a client that probes,
+        # cannot use the answer and falls back (VS Code Copilot) never connects.
+        await serve_loop(server, read, write, lifespan_state=state,
+                         init_options=server.create_initialization_options())
 
 
 if __name__ == "__main__":

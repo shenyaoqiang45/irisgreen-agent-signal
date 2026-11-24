@@ -5,6 +5,7 @@ import asyncio
 import hmac
 import json
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -14,8 +15,10 @@ from pathlib import Path
 from PIL import Image
 
 from visualizer.renderer.card import CardRenderer
+from .credentials import load, store_path
 from .media import project_media
 from .page_summary import open_page
+from .produce import project_produce
 from .presentation import AgentPresentation
 from .receiver import Receiver, Rejected
 from .selection import project_selection
@@ -25,29 +28,60 @@ SNAPSHOT = "/api/v1/agent/snapshot"
 PAGE = "/api/v1/page/open"
 SELECTION = "/api/v1/selection"
 MEDIA = "/api/v1/media"
+PRODUCE = "/api/v1/produce"
 LIMIT = 65536
 
 
-def make_server(credentials, port=8171, preview=None, priorities=None):
+def _checked(credentials):
     if not credentials or any(not isinstance(token, str) or not token.isascii() or
                               len(token) < 24 for token in credentials.values()):
-        raise ValueError("configure a distinct ASCII bearer token (24+ characters) per agent")
+        raise ValueError("no usable reporter identities: run python -m agent_status.setup, or give "
+                         "each agent a distinct ASCII bearer token (24+ characters)")
     if len(set(credentials.values())) != len(credentials):
         raise ValueError("tokens must not be shared between agent identities")
+    return credentials
+
+
+def _stamp(path):
+    try:
+        stat = Path(path).stat()
+        return stat.st_mtime_ns, stat.st_size
+    except (OSError, TypeError):
+        return None
+
+
+def make_server(credentials, port=8171, preview=None, priorities=None, store=None):
+    """`credentials` are fixed; identities in the `store` file follow it as it changes."""
+    def identities():
+        return _checked({**(load(store)["agents"] if store else {}), **credentials})
+
+    known = {"stamp": _stamp(store), "credentials": identities()}
     receiver = Receiver()
     presentation = AgentPresentation(receiver, priorities)
     renderer = CardRenderer() if preview else None
     state = threading.Lock()
+
+    def refresh():
+        stamp = _stamp(store)
+        with state:
+            if stamp == known["stamp"]:
+                return
+            known["stamp"] = stamp
+            try:
+                known["credentials"] = identities()
+            except ValueError as exc:
+                print(f"credential store ignored: {exc}", file=sys.stderr, flush=True)
 
     class Handler(BaseHTTPRequestHandler):
         timeout = 2
 
         def do_POST(self):
             try:
-                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE, SELECTION, MEDIA):
+                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE, SELECTION, MEDIA, PRODUCE):
                     raise Rejected(404, "unknown endpoint")
+                refresh()
                 auth = self.headers.get("Authorization", "").encode("latin1")
-                agent = next((a for a, t in credentials.items()
+                agent = next((a for a, t in known["credentials"].items()
                               if hmac.compare_digest(auth, f"Bearer {t}".encode())), None)
                 if agent is None:
                     raise Rejected(401, "invalid authorization")
@@ -72,6 +106,8 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
                         data = project_selection(receiver, agent, event)
                     elif self.path == MEDIA:
                         data = project_media(receiver, agent, event)
+                    elif self.path == PRODUCE:
+                        data = project_produce(receiver, agent, event)
                     else:
                         data = receiver.receive(event, agent)
                 code = 200
@@ -118,7 +154,7 @@ def _invalid(_):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8171)
+    parser.add_argument("--port", type=int, help="default: the credential store's port (8171)")
     parser.add_argument("--preview", type=Path, required=True, help="local PNG output")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--device", metavar="ADDRESS", help="operator opt-in: overwrite group 1")
@@ -127,7 +163,8 @@ if __name__ == "__main__":
                         help="optional bounded run; otherwise keep serving until stopped")
     args = parser.parse_args()
     args.preview.parent.mkdir(parents=True, exist_ok=True)
-    with make_server(json.loads(os.environ["IGASP_CREDENTIALS"]), args.port, args.preview) as server:
+    explicit = json.loads(os.environ.get("IGASP_CREDENTIALS") or "{}")
+    with make_server(explicit, args.port or load()["port"], args.preview, store=store_path()) as server:
         try:
             if args.device or args.simulate_device:
                 from .output import project

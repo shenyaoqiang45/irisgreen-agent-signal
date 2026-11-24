@@ -1,4 +1,4 @@
-"""Project the Chinese gloss of the English word or short sentence under the cursor."""
+"""Project the Chinese gloss of a short selection in any language."""
 
 import re
 
@@ -10,25 +10,27 @@ EXPRESSION = "selection"
 HOLD_MS = 60000
 LIMIT = 160
 
-_WORD = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
 _CJK = re.compile(r"[\u3400-\u9fff]")
+_LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 _SPACE = re.compile(r"\s+")
+_SENTENCE = re.compile(r"[。！？]|[.?!](?:\s|$)")
 
 
 def accept(text):
-    """Return a short English selection, or empty when it should not be translated."""
+    """Return a short selection, or empty when it should not be translated.
+
+    Any language is eligible. Digits, long passages, and more than one
+    sentence are not. A selection that is already Chinese is still eligible
+    here; the caller drops it when the translator reports Chinese.
+    """
     text = _SPACE.sub(" ", text or "").strip()
     if not text or len(text) > 140:
         return ""
-    if len(re.findall(r"[.?!](?:\s|$)", text)) > 1:
+    if len(_SENTENCE.findall(text)) > 1:
         return ""
-    words = _WORD.findall(text)
-    if not words or len(words) > 24:
+    if not _LETTER.search(text):
         return ""
-    if _CJK.search(text):
-        return ""
-    letters = sum(len(word) for word in words)
-    if letters / max(len(_SPACE.sub("", text)), 1) < 0.55:
+    if len(text.split()) > 24:
         return ""
     return text
 

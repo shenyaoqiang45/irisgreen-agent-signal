@@ -11,6 +11,7 @@ PRIORITIES = {"urgent": 0, "attention": 1, "expression": 2, "task": 3, "ambient"
 # sits in front of that gloss until the viewer closes.
 SELECTION_RANK = 1.5
 MEDIA_RANK = 1.25
+PRODUCE_RANK = 1.4
 
 
 class AgentPresentation:
@@ -54,6 +55,8 @@ class AgentPresentation:
                          "attention" if n["intent"] == "approval_required" else "expression")
                 if sid == "media" and level == "expression":
                     rank = MEDIA_RANK
+                elif sid == "produce" and level == "expression":
+                    rank = PRODUCE_RANK
                 elif sid == "selection" and level == "expression":
                     rank = SELECTION_RANK
                 else:

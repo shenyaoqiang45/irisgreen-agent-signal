@@ -11,13 +11,17 @@ from agent_status.receiver import Receiver
 from agent_status.selection import accept, project_selection
 
 
-def test_only_a_short_english_selection_is_translated():
+def test_a_short_phrase_in_any_language_can_be_translated():
     assert accept("  neural   network ") == "neural network"
     assert accept("The wall shows one sentence.") == "The wall shows one sentence."
-    assert accept("你好") == ""
-    assert accept("see 你好") == ""
+    assert accept("bonjour") == "bonjour"
+    assert accept("こんにちは") == "こんにちは"
+    assert accept("안녕하세요") == "안녕하세요"
+    assert accept("Привет") == "Привет"
+    assert accept("你好") == "你好"
     assert accept("12345") == ""
     assert accept("one. two. three.") == ""
+    assert accept("一つ。二つ。") == ""
     assert accept("word " * 40) == ""
 
 
@@ -92,7 +96,9 @@ def test_selection_endpoint_requires_the_browser_token():
     try:
         status, body = _post(server.server_port, token, {"text": "latency", "translation": "延迟"})
         assert status == 200 and body["expression"]["message"] == "延迟"
-        status, body = _post(server.server_port, token, {"text": "see 中文", "translation": "中文"})
+        status, body = _post(server.server_port, token, {"text": "こんにちは", "translation": "你好"})
+        assert status == 200 and body["expression"]["message"] == "你好"
+        status, body = _post(server.server_port, token, {"text": "你好", "translation": "你好"})
         assert status == 200 and body["skipped"]
         status, _ = _post(server.server_port, "x" * 24, {"text": "hello", "translation": "你好"})
         assert status == 401

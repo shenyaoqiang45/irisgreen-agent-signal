@@ -18,6 +18,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     schedule({frameId: 0, tabId: sender.tab.id, url: sender.tab.url || "https://tab"});
   } else if (message.type === "selection") {
     translateSelection(message.text, sender.tab.id);
+  } else if (message.type === "produce") {
+    publishProduce(message.hint, sender.tab.id);
   } else if (message.type === "media") {
     publishMedia(message, sender.tab.id);
   } else if (message.type === "media-clear") {
@@ -196,15 +198,43 @@ function blobBase64(blob) {
   });
 }
 
+async function publishProduce(hint, tabId) {
+  const label = String(hint || "").replace(/\s+/g, " ").trim();
+  if (!label) return;
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !tab.active) return;
+  const settings = await chrome.storage.local.get(["token", "port"]);
+  if ((settings.token || "").length < 24) return;
+  try {
+    const response = await fetch(`http://127.0.0.1:${Number(settings.port) || 8171}/api/v1/produce`, {
+      method: "POST",
+      headers: {"Authorization": `Bearer ${settings.token}`, "Content-Type": "application/json"},
+      body: JSON.stringify({hint: label})
+    });
+    const body = await response.json();
+    if (!response.ok || !body.expression) return;
+    await chrome.storage.local.set({
+      lastTitle: body.expression.title,
+      lastMessage: body.expression.message
+    });
+  } catch {
+    return;
+  }
+}
+
 async function fetchTranslation(text) {
   const edge = await requestTranslation(
-    "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans",
+    "https://edge.microsoft.com/translate/translatetext?to=zh-Hans",
     {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify([text])});
-  const line = edge && edge[0] && edge[0].translations && edge[0].translations[0] && edge[0].translations[0].text;
+  const hit = edge && edge[0];
+  const detected = hit && hit.detectedLanguage && hit.detectedLanguage.language;
+  if (detected && /^zh\b/i.test(detected)) return "";
+  const line = hit && hit.translations && hit.translations[0] && hit.translations[0].text;
   if (line && line.trim()) return line.trim();
   const backup = await requestTranslation(
-    "https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=" + encodeURIComponent(text));
-  return ((backup && backup.responseData && backup.responseData.translatedText) || "").trim();
+    "https://api.mymemory.translated.net/get?langpair=autodetect|zh-CN&q=" + encodeURIComponent(text));
+  const fallback = ((backup && backup.responseData && backup.responseData.translatedText) || "").trim();
+  return fallback && fallback !== text ? fallback : "";
 }
 
 async function requestTranslation(url, options) {

@@ -18,28 +18,53 @@ MCP client but a **simulated projector**.
 
 ## Connect a real agent (preview only by default)
 
-Start **one receiver** shared by all agents. In PowerShell, for one agent:
+Register the reporter with Cursor, Codex and VS Code Copilot, then start **one
+receiver** shared by all agents:
 
 ```powershell
-$env:IGASP_AGENT = "codex"
-$env:IGASP_TOKEN = & .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(32))"
-$env:IGASP_CREDENTIALS = @{codex=$env:IGASP_TOKEN} | ConvertTo-Json -Compress
+.\.venv\Scripts\python.exe -m agent_status.setup
 .\.venv\Scripts\python.exe -m agent_status.http --preview irisgreen_data\status.png
 ```
 
-Generate a different token for each additional identity in `IGASP_CREDENTIALS`.
-Keep that mapping private to the receiver. Give a client **only its own**
-`IGASP_AGENT` and `IGASP_TOKEN` via its local secret/environment configuration.
+`setup` gives each client its own identity (`cursor`, `codex`, `copilot`) and
+token, kept in `~/.irisgreen/credentials.json` (`IGASP_HOME` moves it). It adds
+a stdio server named `irisgreen-status` to the client's user-level file, so the
+client can report from any workspace:
+
+| Client | File | Entry |
+|---|---|---|
+| Cursor | `~/.cursor/mcp.json` | `mcpServers` |
+| Codex (CLI, IDE extension, desktop app) | `~/.codex/config.toml` | `[mcp_servers.irisgreen-status]` |
+| VS Code Copilot, Copilot CLI | `~/.copilot/mcp-config.json` | `mcpServers` |
+
+Each entry runs `mcp/irisgreen-agent-status/launch.py --agent <identity>` with
+the interpreter that ran `setup`. No token is written to a client file; the
+reporter reads its own from the store on each call. The rest of the file is
+preserved, and an entry that already carries `IGASP_TOKEN` is kept and its
+token recorded. Name clients to limit the run (`agent_status.setup codex`).
+Running it again changes nothing. `setup` ends by asking the running receiver
+whether it knows each identity. Reload a client afterwards.
+
+The receiver reads the same store and rereads it when the file changes, so a
+later `setup` needs no restart. `IGASP_CREDENTIALS`, a JSON object of identity
+to token, still works and adds to the store. A reporter can likewise be given
+`IGASP_AGENT`, `IGASP_TOKEN` and optionally `IGASP_PORT` instead of `--agent`.
 Do not commit tokens. Preview files may contain private task information; keep
 them in an operator-controlled directory.
 
-Register a **stdio** server named `irisgreen-status` in Cursor or Codex:
+VS Code Copilot reads `~/.copilot/mcp-config.json` and a workspace-root
+`.mcp.json`; it does not read `.vscode/mcp.json` directly. Its client probes
+`server/discover` and then falls back to the `initialize` handshake. The
+reporter therefore serves the handshake protocol only: the SDK default answers
+the probe and then refuses the handshake, and the connection fails.
 
-| Setting | Value |
-|---|---|
-| Command | Absolute path to the repo's `.venv\Scripts\python.exe` |
-| Arguments | One absolute path to `mcp\irisgreen-agent-status\launch.py` |
-| Environment passed to server | `IGASP_AGENT`, `IGASP_TOKEN`, optional `IGASP_PORT` (default `8171`) |
+An agent that has a shell but no MCP tools reports the same way:
+
+```powershell
+.\.venv\Scripts\python.exe -m agent_status.report --agent copilot --session chat-1 "Tests pass" "Ready to merge"
+```
+
+It prints the receipt and exits non-zero when the report was not accepted.
 
 Use the reporting server **instead of** the projector-control MCP for agents
 that should only report status. No working-directory assumption or BLE
@@ -87,11 +112,15 @@ characters, as one `agent.expression` in session `browser`. The next page
 replaces it. Give this caller its own credential, for example `"browser"`.
 The extension in `extensions/page-glance` posts that body when a page finishes
 loading in the active tab. The same extension watches the mouse selection.
-A short English word, phrase, or sentence is translated to Chinese and posted
+A short word, phrase, or sentence in any language is translated to Chinese and posted
 to `/api/v1/selection` as `{"text","translation"}`. The receiver shows that
 pair for 60 seconds in session `selection`, replacing the previous selection.
-The same text is not sent again. Chinese, long passages, and more than one
-sentence are ignored. On X, opening a status photo
+The same text is not sent again. Text the translator detects as Chinese, long passages, and more than one
+sentence are ignored. Clicking a fruit or vegetable picture posts the label on that picture
+(its alt text, caption, or file name) to `/api/v1/produce` as `{"hint"}`.
+A known item is shown for 60 seconds as its Chinese name and kilocalories per 100 g.
+An opened photo still sits in front of that card. Leaving for another address clears it.
+On X, opening a status photo
 (`/status/<id>/photo/<n>`) posts that picture to `/api/v1/media` as
 `{image_base64}`. The receiver letterboxes it onto the 640×480 field and lights only
 pixels brighter than 127. Near-black stays off, and so does the letterbox. The picture
@@ -202,3 +231,16 @@ Clear returned OK, status then reported `projecting:false`, and disconnect
 succeeded. This verifies one agent-authored expression on hardware, not the
 seven-stage sequence (simulator only), unattended live forwarding, or the
 status-server integration in the actual Cursor and Codex UIs.
+
+**2026-11-24 verification:** `agent_status.setup` ran on a Windows machine with
+Cursor, Codex and VS Code Copilot. Codex CLI 0.171 listed `irisgreen-status` as
+enabled. The command from each of the three client files was then started by a
+scripted MCP client and reported to a preview-only receiver; all three were
+accepted under their own identity, as was `agent_status.report`. A raw stdio
+client that sent `server/discover` and then `initialize` connected and listed
+the tools; before the handshake-only change the same sequence was refused with
+`-32022`. After the receiver was restarted with `--device`, a VS Code Copilot
+session loaded the tool and its `report_expression` was accepted; the card the
+receiver rendered for the projector named `copilot` and carried the message.
+Not yet done: the same call from inside Cursor and Codex, and confirmation by
+eye that the wall showed these cards.

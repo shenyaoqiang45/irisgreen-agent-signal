@@ -1,8 +1,8 @@
 {
   "name": "irisgreen-selection",
   "displayName": "IrisGreen 划词翻译",
-  "description": "在 VS Code 和 Cursor 里选中英文单词或短句，把中文投到 IrisGreen。",
-  "version": "0.1.0",
+  "description": "在 VS Code 和 Cursor 里选中任意语言的词或短句，把中文投到 IrisGreen。",
+  "version": "0.1.1",
   "publisher": "irisgreen",
   "engines": {
     "vscode": "^1.80.0"
@@ -18,7 +18,7 @@
         "irisgreen.translate": {
           "type": "boolean",
           "default": true,
-          "description": "选中英文单词、短语或一句短句时翻译并投影。"
+          "description": "选中任意语言的单词、短语或一句短句时译成中文并投影。"
         },
         "irisgreen.port": {
           "type": "number",

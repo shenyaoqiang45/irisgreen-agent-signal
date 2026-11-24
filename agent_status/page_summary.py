@@ -3,6 +3,7 @@
 import re
 
 from .media import dismiss_media, is_opened_media
+from .produce import dismiss_produce
 from .protocol import envelope
 from .receiver import Rejected
 from .selection import EXPRESSION as SELECTION_EXPRESSION
@@ -51,6 +52,7 @@ def open_page(receiver, agent, body):
     previous = receiver.page_urls.get(agent)
     if previous and previous != key:
         _dismiss_selection(receiver, agent)
+        dismiss_produce(receiver, agent)
         if not is_opened_media(url):
             dismiss_media(receiver, agent)
     receiver.page_urls[agent] = key

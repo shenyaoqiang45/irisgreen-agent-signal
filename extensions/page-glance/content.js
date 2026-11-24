@@ -40,11 +40,11 @@ if (globalThis.__irisgreenWatch) {
   let selectionTimer = 0;
   let gesture = "";
   const remember = () => {
-    const text = selectedEnglish();
+    const text = selectedPhrase();
     if (text) gesture = text;
   };
   const publish = () => {
-    const text = selectedEnglish() || gesture;
+    const text = selectedPhrase() || gesture;
     gesture = "";
     if (!text) return;
     chrome.runtime.sendMessage({type: "selection", text}).catch(() => {});
@@ -58,6 +58,15 @@ if (globalThis.__irisgreenWatch) {
   document.addEventListener("selectionchange", () => {
     remember();
     settle();
+  }, true);
+  document.addEventListener("click", event => {
+    const img = event.target.closest && event.target.closest("img");
+    if (!img) return;
+    const box = img.getBoundingClientRect();
+    if (box.width < 80 || box.height < 80) return;
+    const hint = produceHint(img);
+    if (!hint) return;
+    chrome.runtime.sendMessage({type: "produce", hint}).catch(() => {});
   }, true);
   for (const event of ["pointerup", "mouseup"]) {
     document.addEventListener(event, () => {
@@ -111,7 +120,18 @@ function enlarge(src) {
   }
 }
 
-function selectedEnglish() {
+function produceHint(img) {
+  const bits = [img.alt, img.title, img.getAttribute("aria-label")];
+  const caption = img.closest("figure") && img.closest("figure").querySelector("figcaption");
+  if (caption) bits.push(caption.innerText);
+  try {
+    const url = new URL(img.currentSrc || img.src || "", location.href);
+    bits.push(decodeURIComponent(url.pathname).replace(/[\\/_.-]+/g, " "));
+  } catch { /* an unnamed picture has nothing to look up */ }
+  return bits.filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
+function selectedPhrase() {
   const active = document.activeElement;
   if (active && active.tagName === "INPUT" && active.type === "password") return "";
   const text = String(window.getSelection() || "")
@@ -119,11 +139,8 @@ function selectedEnglish() {
     .replace(/\s+/g, " ")
     .trim();
   if (!text || text.length > 140) return "";
-  if ((text.match(/[.?!](?:\s|$)/g) || []).length > 1) return "";
-  if (/[\u3400-\u9fff]/.test(text)) return "";
-  const words = text.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || [];
-  if (!words.length || words.length > 24) return "";
-  const letters = words.reduce((sum, word) => sum + word.length, 0);
-  if (letters / text.replace(/\s/g, "").length < 0.55) return "";
+  if ((text.match(/(?:[。！？]|[.?!](?:\s|$))/g) || []).length > 1) return "";
+  if (!/\p{L}/u.test(text)) return "";
+  if (text.split(/\s+/).length > 24) return "";
   return text;
 }
