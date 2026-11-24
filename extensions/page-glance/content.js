@@ -34,6 +34,7 @@ if (globalThis.__irisgreenWatch) {
   setInterval(() => {
     clearTimeout(timer);
     timer = setTimeout(sample, 400);
+    watchOpenedMedia();
   }, 1200);
 
   let selectionTimer = 0;
@@ -65,6 +66,48 @@ if (globalThis.__irisgreenWatch) {
       clearTimeout(selectionTimer);
       publish();
     }, true);
+  }
+
+  let mediaKey = "";
+  const watchOpenedMedia = () => {
+    const host = location.hostname.replace(/^www\./, "");
+    const opened = (host === "x.com" || host === "twitter.com")
+      && /\/status\/\d+\/photo\/\d+/.test(location.pathname);
+    if (!opened) {
+      if (!mediaKey) return;
+      mediaKey = "";
+      chrome.runtime.sendMessage({type: "media-clear"}).catch(() => {});
+      return;
+    }
+    const img = largestTwimg();
+    const src = img && enlarge(img.currentSrc || img.src);
+    if (!src || src === mediaKey) return;
+    mediaKey = src;
+    chrome.runtime.sendMessage({type: "media", src}).catch(() => {});
+  };
+}
+
+function largestTwimg() {
+  const candidates = [...document.querySelectorAll("img")].filter(img => {
+    const src = img.currentSrc || img.src || "";
+    if (!/twimg\.com/.test(src)) return false;
+    const box = img.getBoundingClientRect();
+    return box.width >= 120 && box.height >= 120;
+  });
+  candidates.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
+  return candidates[0] || null;
+}
+
+function enlarge(src) {
+  if (!src) return "";
+  try {
+    const url = new URL(src, location.href);
+    if (url.hostname.endsWith("twimg.com") && url.pathname.includes("/media/")) {
+      url.searchParams.set("name", "medium");
+    }
+    return url.href;
+  } catch {
+    return src;
   }
 }
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from PIL import Image
 
 from visualizer.renderer.card import CardRenderer
+from .media import project_media
 from .page_summary import open_page
 from .presentation import AgentPresentation
 from .receiver import Receiver, Rejected
@@ -23,6 +24,7 @@ EVENTS = "/api/v1/agent/events"
 SNAPSHOT = "/api/v1/agent/snapshot"
 PAGE = "/api/v1/page/open"
 SELECTION = "/api/v1/selection"
+MEDIA = "/api/v1/media"
 LIMIT = 65536
 
 
@@ -42,7 +44,7 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
 
         def do_POST(self):
             try:
-                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE, SELECTION):
+                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE, SELECTION, MEDIA):
                     raise Rejected(404, "unknown endpoint")
                 auth = self.headers.get("Authorization", "").encode("latin1")
                 agent = next((a for a, t in credentials.items()
@@ -68,6 +70,8 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
                         data = open_page(receiver, agent, event)
                     elif self.path == SELECTION:
                         data = project_selection(receiver, agent, event)
+                    elif self.path == MEDIA:
+                        data = project_media(receiver, agent, event)
                     else:
                         data = receiver.receive(event, agent)
                 code = 200

@@ -91,7 +91,13 @@ A short English word, phrase, or sentence is translated to Chinese and posted
 to `/api/v1/selection` as `{"text","translation"}`. The receiver shows that
 pair for 60 seconds in session `selection`, replacing the previous selection.
 The same text is not sent again. Chinese, long passages, and more than one
-sentence are ignored. The extension asks the Edge translation endpoint first
+sentence are ignored. On X, opening a status photo
+(`/status/<id>/photo/<n>`) posts that picture to `/api/v1/media` as
+`{image_base64}`. The receiver letterboxes it onto the 640×480 field and lights only
+pixels brighter than 127. Near-black stays off, and so does the letterbox. The picture
+stays in front of the page sentence until the viewer closes. `{"clear": true}` removes it. Leaving for another address
+clears it too.
+The extension asks the Edge translation endpoint first
 and caches repeats, so a second look at the same word does not call out again.
 `extensions/vscode-selection` does the same thing inside VS Code and Cursor:
 the editor selection event replaces the browser mouse listener, and the

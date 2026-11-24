@@ -7,8 +7,10 @@ from .image import image_mask
 
 PRIORITIES = {"urgent": 0, "attention": 1, "expression": 2, "task": 3, "ambient": 4, "music": 5}
 # A live gloss sits between an approval and a page summary, so a timeline
-# refresh cannot cover the phrase the user just selected.
+# refresh cannot cover the phrase the user just selected. An opened picture
+# sits in front of that gloss until the viewer closes.
 SELECTION_RANK = 1.5
+MEDIA_RANK = 1.25
 
 
 class AgentPresentation:
@@ -50,7 +52,12 @@ class AgentPresentation:
             for n in s.expressions.values():
                 level = ("urgent" if n.get("urgency") == "urgent" else
                          "attention" if n["intent"] == "approval_required" else "expression")
-                rank = SELECTION_RANK if sid == "selection" and level == "expression" else self.priorities[level]
+                if sid == "media" and level == "expression":
+                    rank = MEDIA_RANK
+                elif sid == "selection" and level == "expression":
+                    rank = SELECTION_RANK
+                else:
+                    rank = self.priorities[level]
                 image = image_mask(n["image_base64"]) if n.get("image_base64") else b""
                 cards.insert(0, Card((source, n["title"], n["intent"], n.get("message", ""), n.get("icon", "")),
                                      rank, n["revision"], n["display_until"], accent=accent,

@@ -18,6 +18,10 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     schedule({frameId: 0, tabId: sender.tab.id, url: sender.tab.url || "https://tab"});
   } else if (message.type === "selection") {
     translateSelection(message.text, sender.tab.id);
+  } else if (message.type === "media") {
+    publishMedia(message, sender.tab.id);
+  } else if (message.type === "media-clear") {
+    publishMedia({clear: true}, sender.tab.id);
   }
 });
 
@@ -105,6 +109,91 @@ async function translateSelection(text, tabId) {
   } finally {
     if (inflightSelection === source) inflightSelection = "";
   }
+}
+
+let mediaGeneration = 0;
+let mediaFlight = false;
+let mediaPending = null;
+
+function publishMedia(message, tabId) {
+  mediaPending = {message, tabId};
+  if (mediaFlight) return;
+  mediaFlight = true;
+  drainMedia();
+}
+
+async function drainMedia() {
+  try {
+    while (mediaPending) {
+      const next = mediaPending;
+      mediaPending = null;
+      const generation = ++mediaGeneration;
+      await postMedia(next.message, next.tabId, generation);
+    }
+  } finally {
+    mediaFlight = false;
+    if (mediaPending) {
+      mediaFlight = true;
+      drainMedia();
+    }
+  }
+}
+
+async function postMedia(message, tabId, generation) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !tab.active || generation !== mediaGeneration) return;
+  const settings = await chrome.storage.local.get(["token", "port"]);
+  if ((settings.token || "").length < 24) return;
+  const payload = message.clear ? {clear: true} : await mediaPayload(message);
+  if (!payload || generation !== mediaGeneration) return;
+  try {
+    const response = await fetch(`http://127.0.0.1:${Number(settings.port) || 8171}/api/v1/media`, {
+      method: "POST",
+      headers: {"Authorization": `Bearer ${settings.token}`, "Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json();
+    if (!response.ok || !body.expression || generation !== mediaGeneration) return;
+    await chrome.storage.local.set({
+      lastTitle: body.expression.title,
+      lastMessage: body.expression.message
+    });
+  } catch {
+    return;
+  }
+}
+
+async function mediaPayload(message) {
+  const source = message.src;
+  if (!source) return null;
+  const response = await fetch(source).catch(() => null);
+  if (!response || !response.ok) return null;
+  const bitmap = await createImageBitmap(await response.blob()).catch(() => null);
+  if (!bitmap) return null;
+  const scale = Math.min(320 / bitmap.width, 240 / bitmap.height, 1);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = new OffscreenCanvas(width, height);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  let quality = 0.72;
+  let blob = await canvas.convertToBlob({type: "image/jpeg", quality});
+  while (blob.size > 36000 && quality > 0.35) {
+    quality -= 0.12;
+    blob = await canvas.convertToBlob({type: "image/jpeg", quality});
+  }
+  if (blob.size > 48000) return null;
+  const image_base64 = await blobBase64(blob);
+  return {image_base64};
+}
+
+function blobBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function fetchTranslation(text) {
