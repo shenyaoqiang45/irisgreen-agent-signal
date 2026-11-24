@@ -13,8 +13,12 @@ for (const event of ["onCompleted", "onHistoryStateUpdated", "onReferenceFragmen
 }
 chrome.tabs.onActivated.addListener(({tabId}) => schedule({frameId: 0, tabId, url: "https://tab"}));
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (!message || message.type !== "page-changed" || !sender.tab || sender.tab.id == null) return;
-  schedule({frameId: 0, tabId: sender.tab.id, url: sender.tab.url || "https://tab"});
+  if (!message || !sender.tab || sender.tab.id == null) return;
+  if (message.type === "page-changed") {
+    schedule({frameId: 0, tabId: sender.tab.id, url: sender.tab.url || "https://tab"});
+  } else if (message.type === "selection") {
+    translateSelection(message.text, sender.tab.id);
+  }
 });
 
 async function watchOpenPages() {
@@ -62,6 +66,70 @@ async function glance(tabId) {
   }
 }
 
+const glosses = new Map();
+let selectionGeneration = 0;
+let postedSelection = "";
+
+async function translateSelection(text, tabId) {
+  const source = String(text || "").replace(/\s+/g, " ").trim();
+  if (!source || source === postedSelection) return;
+  const generation = ++selectionGeneration;
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !tab.active || generation !== selectionGeneration) return;
+  const settings = await chrome.storage.local.get(["translate", "token", "port"]);
+  if (settings.translate === false || (settings.token || "").length < 24) return;
+  let chinese = glosses.get(source);
+  if (!chinese) {
+    chinese = await fetchTranslation(source);
+    if (chinese && glosses.size > 200) glosses.clear();
+    if (chinese) glosses.set(source, chinese);
+  }
+  if (!chinese || generation !== selectionGeneration) return;
+  const current = await chrome.tabs.get(tabId).catch(() => null);
+  if (!current || !current.active) return;
+  try {
+    const response = await fetch(`http://127.0.0.1:${Number(settings.port) || 8171}/api/v1/selection`, {
+      method: "POST",
+      headers: {"Authorization": `Bearer ${settings.token}`, "Content-Type": "application/json"},
+      body: JSON.stringify({text: source, translation: chinese})
+    });
+    const body = await response.json();
+    if (!response.ok || !body.expression || generation !== selectionGeneration) return;
+    postedSelection = source;
+    await chrome.storage.local.set({
+      lastTitle: body.expression.title,
+      lastMessage: body.expression.message
+    });
+  } catch {
+    return;
+  }
+}
+
+async function fetchTranslation(text) {
+  const edge = await requestTranslation(
+    "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans",
+    {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify([text])});
+  const line = edge && edge[0] && edge[0].translations && edge[0].translations[0] && edge[0].translations[0].text;
+  if (line && line.trim()) return line.trim();
+  const backup = await requestTranslation(
+    "https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=" + encodeURIComponent(text));
+  return ((backup && backup.responseData && backup.responseData.translatedText) || "").trim();
+}
+
+async function requestTranslation(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(url, {...(options || {}), signal: controller.signal});
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function extract() {
   const skip = /^(skip navigation|ask youtube|create|home|shorts|subscriptions|you|your channel|history|playlists|show more)$/i;
   const clean = (value) => (value || "")
@@ -70,12 +138,26 @@ function extract() {
     .replace(/^\d+\.\s*/, "")
     .replace(/\s+\d+\s+(?:hour|hours|minute|minutes|second|seconds).*$/i, "")
     .trim();
-  const regions = [...document.querySelectorAll("article, main, [role=main], .markdown-card")]
-    .filter(el => !el.closest("nav, aside, [role=navigation]"))
-    .map(el => (el.innerText || "").trim())
-    .filter(text => text.length >= 40);
-  const body = (document.body && document.body.innerText) || "";
-  const text = clean(regions.length ? regions[regions.length - 1] : body)
+  const readText = (root) => {
+    if (!root) return "";
+    const copy = root.cloneNode(true);
+    copy.querySelectorAll("nav, aside, footer, [role=navigation], [role=contentinfo]").forEach(node => node.remove());
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;left:-10000px;top:0;width:800px;visibility:hidden";
+    holder.appendChild(copy);
+    document.documentElement.appendChild(holder);
+    const value = copy.innerText || copy.textContent || "";
+    holder.remove();
+    return value;
+  };
+  const hidden = "nav, aside, footer, [role=navigation], [role=contentinfo]";
+  const cards = [...document.querySelectorAll(".markdown-card")]
+    .filter(el => !el.closest(hidden));
+  const mains = [...document.querySelectorAll("article, main, [role=main]")]
+    .filter(el => !el.closest(hidden));
+  const source = cards.length ? cards[cards.length - 1] : mains[0];
+  const body = readText(source || document.body);
+  const text = clean(body)
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .slice(0, 8000);

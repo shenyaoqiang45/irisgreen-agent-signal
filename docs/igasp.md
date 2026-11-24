@@ -86,7 +86,18 @@ user just opened. The receiver keeps the opening sentence, at most 160
 characters, as one `agent.expression` in session `browser`. The next page
 replaces it. Give this caller its own credential, for example `"browser"`.
 The extension in `extensions/page-glance` posts that body when a page finishes
-loading in the active tab.
+loading in the active tab. The same extension watches the mouse selection.
+A short English word, phrase, or sentence is translated to Chinese and posted
+to `/api/v1/selection` as `{"text","translation"}`. The receiver shows that
+pair for 60 seconds in session `selection`, replacing the previous selection.
+The same text is not sent again. Chinese, long passages, and more than one
+sentence are ignored. The extension asks the Edge translation endpoint first
+and caches repeats, so a second look at the same word does not call out again.
+`extensions/vscode-selection` does the same thing inside VS Code and Cursor:
+the editor selection event replaces the browser mouse listener, and the
+Chinese gloss still posts to `/api/v1/selection`. It reads the receiver token
+from `irisgreen.token`, or from `~/.cursor/irisgreen-status.json` when that
+setting is empty.
 `/api/v1/agent/events` accepts any IGASP event. `/api/v1/agent/snapshot` accepts
 only snapshot envelopes. POST `{"session_id":"s1"}` to `/api/v1/agent/snapshot/read`
 to export the authenticated agent's current session as a replayable snapshot.

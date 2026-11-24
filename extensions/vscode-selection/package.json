@@ -1,0 +1,36 @@
+{
+  "name": "irisgreen-selection",
+  "displayName": "IrisGreen 划词翻译",
+  "description": "在 VS Code 和 Cursor 里选中英文单词或短句，把中文投到 IrisGreen。",
+  "version": "0.1.0",
+  "publisher": "irisgreen",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "extensionKind": ["ui"],
+  "contributes": {
+    "configuration": {
+      "title": "IrisGreen",
+      "properties": {
+        "irisgreen.translate": {
+          "type": "boolean",
+          "default": true,
+          "description": "选中英文单词、短语或一句短句时翻译并投影。"
+        },
+        "irisgreen.port": {
+          "type": "number",
+          "default": 8171,
+          "description": "本机接收器端口。"
+        },
+        "irisgreen.token": {
+          "type": "string",
+          "default": "",
+          "description": "接收器令牌。留空时使用本机 ~/.cursor/irisgreen-status.json。"
+        }
+      }
+    }
+  }
+}

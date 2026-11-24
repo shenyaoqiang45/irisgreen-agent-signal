@@ -35,4 +35,36 @@ if (globalThis.__irisgreenWatch) {
     clearTimeout(timer);
     timer = setTimeout(sample, 400);
   }, 1200);
+
+  let selectionTimer = 0;
+  const sendSelection = () => {
+    const text = selectedEnglish();
+    if (!text) return;
+    chrome.runtime.sendMessage({type: "selection", text}).catch(() => {});
+  };
+  document.addEventListener("selectionchange", () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(sendSelection, 280);
+  });
+  document.addEventListener("mouseup", () => {
+    clearTimeout(selectionTimer);
+    sendSelection();
+  });
+}
+
+function selectedEnglish() {
+  const active = document.activeElement;
+  if (active && active.tagName === "INPUT" && active.type === "password") return "";
+  const text = String(window.getSelection() || "")
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text || text.length > 140) return "";
+  if ((text.match(/[.?!](?:\s|$)/g) || []).length > 1) return "";
+  if (/[\u3400-\u9fff]/.test(text)) return "";
+  const words = text.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || [];
+  if (!words.length || words.length > 24) return "";
+  const letters = words.reduce((sum, word) => sum + word.length, 0);
+  if (letters / text.replace(/\s/g, "").length < 0.55) return "";
+  return text;
 }

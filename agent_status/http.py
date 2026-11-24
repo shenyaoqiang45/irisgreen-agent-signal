@@ -6,8 +6,9 @@ import hmac
 import json
 import os
 import tempfile
+import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from PIL import Image
@@ -16,10 +17,12 @@ from visualizer.renderer.card import CardRenderer
 from .page_summary import open_page
 from .presentation import AgentPresentation
 from .receiver import Receiver, Rejected
+from .selection import project_selection
 
 EVENTS = "/api/v1/agent/events"
 SNAPSHOT = "/api/v1/agent/snapshot"
 PAGE = "/api/v1/page/open"
+SELECTION = "/api/v1/selection"
 LIMIT = 65536
 
 
@@ -32,20 +35,20 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
     receiver = Receiver()
     presentation = AgentPresentation(receiver, priorities)
     renderer = CardRenderer() if preview else None
+    state = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         timeout = 2
 
         def do_POST(self):
             try:
-                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE):
+                if self.path not in (EVENTS, SNAPSHOT, SNAPSHOT + "/read", PAGE, SELECTION):
                     raise Rejected(404, "unknown endpoint")
                 auth = self.headers.get("Authorization", "").encode("latin1")
                 agent = next((a for a, t in credentials.items()
                               if hmac.compare_digest(auth, f"Bearer {t}".encode())), None)
                 if agent is None:
                     raise Rejected(401, "invalid authorization")
-                receiver.admit(agent)
                 if self.headers.get_content_type() != "application/json":
                     raise Rejected(415, "expected application/json")
                 size = int(self.headers.get("Content-Length", "-1"))
@@ -53,16 +56,20 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
                     raise Rejected(413, "body must have a bounded Content-Length")
                 event = json.loads(self.rfile.read(size).decode("utf8"), parse_constant=_invalid)
                 json.dumps(event, ensure_ascii=False).encode("utf-8")
-                if self.path == SNAPSHOT and not (isinstance(event, dict) and event.get("type") == "agent.snapshot"):
-                    raise Rejected(400, "expected snapshot event")
-                if self.path == SNAPSHOT + "/read":
-                    if not isinstance(event, dict) or not isinstance(event.get("session_id"), str):
-                        raise Rejected(400, "expected session_id")
-                    data = {"ok": True, "snapshot": receiver.snapshot(agent, event["session_id"])}
-                elif self.path == PAGE:
-                    data = open_page(receiver, agent, event)
-                else:
-                    data = receiver.receive(event, agent)
+                with state:
+                    receiver.admit(agent)
+                    if self.path == SNAPSHOT and not (isinstance(event, dict) and event.get("type") == "agent.snapshot"):
+                        raise Rejected(400, "expected snapshot event")
+                    if self.path == SNAPSHOT + "/read":
+                        if not isinstance(event, dict) or not isinstance(event.get("session_id"), str):
+                            raise Rejected(400, "expected session_id")
+                        data = {"ok": True, "snapshot": receiver.snapshot(agent, event["session_id"])}
+                    elif self.path == PAGE:
+                        data = open_page(receiver, agent, event)
+                    elif self.path == SELECTION:
+                        data = project_selection(receiver, agent, event)
+                    else:
+                        data = receiver.receive(event, agent)
                 code = 200
             except Rejected as exc:
                 code, data = exc.status, {"ok": False, "error": str(exc)}
@@ -75,13 +82,15 @@ def make_server(credentials, port=8171, preview=None, priorities=None):
             self.end_headers()
             self.wfile.write(body)
 
-    class LocalServer(HTTPServer):
+    class LocalServer(ThreadingHTTPServer):
+        daemon_threads = True
         last = None
         latest = None
 
         def service_actions(self):
-            receiver.prune()
-            card = presentation.current()
+            with state:
+                receiver.prune()
+                card = presentation.current()
             tick = int(time.monotonic() * 2) if card and card.pulse else 0
             if renderer and (card, tick) != self.last:
                 frame = renderer.frame(card, receiver.clock())

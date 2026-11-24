@@ -11,6 +11,10 @@ LIMIT = 160
 
 _SPLIT = re.compile(r"[。！？!?]\s*|\n+|\.\s+")
 _HOST = re.compile(r"^https?://([^/?#]+)")
+_FOOTER = re.compile(
+    r"友情链接|版权所有|Copyright|ICP备|公网安备|法律声明|All Rights Reserved",
+    re.I,
+)
 
 
 def summarize(title, text, url=""):
@@ -50,7 +54,8 @@ def _parts(text):
 
 
 def _choose(parts, heading):
-    prose = [(i, part) for i, part in enumerate(parts) if _usable(part, heading) and len(part) >= 24]
+    prose = [(i, part) for i, part in enumerate(parts)
+             if _usable(part, heading) and len(part) >= 24 and not _footer(part)]
     for cue in ("这篇文章", "本文", "总之", "简单说", "结论", "选型建议"):
         found = next((part for _, part in prose if cue in part), "")
         if found:
@@ -59,7 +64,7 @@ def _choose(parts, heading):
         return _current(prose)
     if len(heading) >= 12:
         return heading
-    return next((part for part in parts if _usable(part, heading)), "")
+    return next((part for part in parts if _usable(part, heading) and not _footer(part)), "")
 
 
 def _current(prose):
@@ -73,6 +78,10 @@ def _current(prose):
     if gap >= 4:
         return next(part for i, part in prose if i >= gap_at)
     return prose[0][1]
+
+
+def _footer(part):
+    return bool(_FOOTER.search(part)) or part.count("|") + part.count("｜") >= 3
 
 
 def _usable(part, heading):

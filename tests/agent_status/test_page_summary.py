@@ -48,6 +48,20 @@ def test_tab_switch_keeps_the_open_reply_and_leaves_the_history_list():
     assert glance["message"].startswith("睡眠质量这事，先分清你是睡不着")
 
 
+def test_tab_switch_skips_the_page_footer():
+    page = "\n".join([
+        "探迹",
+        "销售线索、客户管理和营销自动化都在这一页。",
+        "首页", "产品", "价格", "关于", "登录", "注册", "解决方案", "客户案例",
+        "友情链接：阿里巴巴 | 阿里云 | 版权局 | 商标局 | 国家知识产权局",
+        "Copyright 2016 - 2026 广州探迹科技有限公司 粤ICP备16054963号",
+    ])
+    glance = summarize("探迹", page, "https://www.tungee.com/")
+    assert glance["message"].startswith("销售线索、客户管理和营销自动化")
+    assert "友情链接" not in glance["message"]
+    assert "ICP" not in glance["message"]
+
+
 def test_summary_skips_the_menu_and_uses_the_article_point():
     page = "\n".join([
         "首页", "热门话题（商务）", "官方产品",
