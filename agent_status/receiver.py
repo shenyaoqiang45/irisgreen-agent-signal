@@ -36,6 +36,7 @@ class Receiver:
         self.seen = OrderedDict()
         self.requests = defaultdict(deque)
         self.sequence = 0
+        self.page_urls = {}
 
     def admit(self, agent):
         now = time.monotonic()

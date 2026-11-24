@@ -37,19 +37,35 @@ if (globalThis.__irisgreenWatch) {
   }, 1200);
 
   let selectionTimer = 0;
-  const sendSelection = () => {
+  let gesture = "";
+  const remember = () => {
     const text = selectedEnglish();
+    if (text) gesture = text;
+  };
+  const publish = () => {
+    const text = selectedEnglish() || gesture;
+    gesture = "";
     if (!text) return;
     chrome.runtime.sendMessage({type: "selection", text}).catch(() => {});
   };
+  const settle = () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(publish, 320);
+  };
+  // Capture phase: X stops the bubble, and a timeline redraw often clears the
+  // selection before a deferred read. Keep the text from the moment it existed.
   document.addEventListener("selectionchange", () => {
-    clearTimeout(selectionTimer);
-    selectionTimer = setTimeout(sendSelection, 280);
-  });
-  document.addEventListener("mouseup", () => {
-    clearTimeout(selectionTimer);
-    sendSelection();
-  });
+    remember();
+    settle();
+  }, true);
+  for (const event of ["pointerup", "mouseup"]) {
+    document.addEventListener(event, () => {
+      remember();
+      if (!gesture) return;
+      clearTimeout(selectionTimer);
+      publish();
+    }, true);
+  }
 }
 
 function selectedEnglish() {

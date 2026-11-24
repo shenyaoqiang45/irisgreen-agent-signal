@@ -4,7 +4,9 @@ from http.client import HTTPConnection
 from threading import Thread
 
 from agent_status.http import make_server
+from agent_status.page_summary import open_page
 from agent_status.presentation import AgentPresentation
+from agent_status.protocol import envelope
 from agent_status.receiver import Receiver
 from agent_status.selection import accept, project_selection
 
@@ -33,6 +35,53 @@ def test_a_new_selection_replaces_the_previous_gloss_and_then_clears():
     assert project_selection(receiver, "browser", {"text": "你好", "translation": "你好"})["skipped"]
     now[0] += 61
     assert view.current() is None
+
+
+def test_gloss_stays_ahead_of_a_later_page_until_the_hold_ends():
+    now = [1_700_000_000.0]
+    receiver = Receiver(clock=lambda: now[0])
+    view = AgentPresentation(receiver)
+    project_selection(receiver, "browser", {"text": "neural network", "translation": "神经网络"})
+    open_page(receiver, "browser", {
+        "url": "https://x.com/home",
+        "title": "Home / X",
+        "text": "Someone said the launch window is still open for the next round of tests today.",
+    })
+    assert view.current().lines[1] == "neural network"
+    approval = envelope(
+        "agent.expression", "cursor", "s",
+        {"intent": "approval_required", "title": "Approve", "message": "Need you"})
+    receiver.receive(approval, "cursor")
+    assert view.current().lines[1] == "Approve"
+    receiver.receive(envelope(
+        "agent.expression.clear", "cursor", "s",
+        {"expression_id": approval["event_id"]}), "cursor")
+    assert view.current().lines[1] == "neural network"
+    assert view.current().lines[3] == "神经网络"
+    now[0] += 61
+    assert view.current().lines[1] == "Home / X"
+
+
+def test_another_page_replaces_the_gloss_without_waiting_out_the_hold():
+    now = [1_700_000_000.0]
+    receiver = Receiver(clock=lambda: now[0])
+    view = AgentPresentation(receiver)
+    home = {
+        "url": "https://x.com/home",
+        "title": "Home / X",
+        "text": "Someone said the launch window is still open for the next round of tests today.",
+    }
+    open_page(receiver, "browser", home)
+    project_selection(receiver, "browser", {"text": "neural network", "translation": "神经网络"})
+    open_page(receiver, "browser", dict(home, text="Someone said the launch window moved, but this is still the same page."))
+    assert view.current().lines[1] == "neural network"
+    open_page(receiver, "browser", {
+        "url": "https://www.example.com/notes",
+        "title": "Lab notes",
+        "text": "The afternoon note starts with the measurement that actually changed the result.",
+    })
+    assert view.current().lines[1] == "Lab notes"
+    assert "measurement" in view.current().lines[3]
 
 
 def test_selection_endpoint_requires_the_browser_token():

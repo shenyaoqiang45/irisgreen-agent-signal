@@ -4,6 +4,8 @@ import re
 
 from .protocol import envelope
 from .receiver import Rejected
+from .selection import EXPRESSION as SELECTION_EXPRESSION
+from .selection import SESSION as SELECTION_SESSION
 
 SESSION = "browser"
 EXPRESSION = "open-page"
@@ -44,9 +46,23 @@ def open_page(receiver, agent, body):
     payload = summarize(title, text, url)
     if payload is None:
         return {"ok": True, "skipped": True}
+    key = url.split("#", 1)[0]
+    previous = receiver.page_urls.get(agent)
+    if previous and previous != key:
+        _dismiss_selection(receiver, agent)
+    receiver.page_urls[agent] = key
     receipt = receiver.receive(envelope("agent.expression", agent, SESSION, payload), agent)
     return {"ok": True, "event_id": receipt["event_id"],
             "expression": {"title": payload["title"], "message": payload["message"]}}
+
+
+def _dismiss_selection(receiver, agent):
+    try:
+        receiver.receive(envelope(
+            "agent.expression.clear", agent, SELECTION_SESSION,
+            {"expression_id": SELECTION_EXPRESSION}), agent)
+    except Rejected:
+        return
 
 
 def _parts(text):

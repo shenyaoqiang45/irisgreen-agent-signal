@@ -68,26 +68,27 @@ async function glance(tabId) {
 
 const glosses = new Map();
 let selectionGeneration = 0;
-let postedSelection = "";
+let inflightSelection = "";
 
 async function translateSelection(text, tabId) {
   const source = String(text || "").replace(/\s+/g, " ").trim();
-  if (!source || source === postedSelection) return;
+  if (!source || source === inflightSelection) return;
   const generation = ++selectionGeneration;
-  const tab = await chrome.tabs.get(tabId).catch(() => null);
-  if (!tab || !tab.active || generation !== selectionGeneration) return;
-  const settings = await chrome.storage.local.get(["translate", "token", "port"]);
-  if (settings.translate === false || (settings.token || "").length < 24) return;
-  let chinese = glosses.get(source);
-  if (!chinese) {
-    chinese = await fetchTranslation(source);
-    if (chinese && glosses.size > 200) glosses.clear();
-    if (chinese) glosses.set(source, chinese);
-  }
-  if (!chinese || generation !== selectionGeneration) return;
-  const current = await chrome.tabs.get(tabId).catch(() => null);
-  if (!current || !current.active) return;
+  inflightSelection = source;
   try {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab || !tab.active || generation !== selectionGeneration) return;
+    const settings = await chrome.storage.local.get(["translate", "token", "port"]);
+    if (settings.translate === false || (settings.token || "").length < 24) return;
+    let chinese = glosses.get(source);
+    if (!chinese) {
+      chinese = await fetchTranslation(source);
+      if (chinese && glosses.size > 200) glosses.clear();
+      if (chinese) glosses.set(source, chinese);
+    }
+    if (!chinese || generation !== selectionGeneration) return;
+    const current = await chrome.tabs.get(tabId).catch(() => null);
+    if (!current || !current.active) return;
     const response = await fetch(`http://127.0.0.1:${Number(settings.port) || 8171}/api/v1/selection`, {
       method: "POST",
       headers: {"Authorization": `Bearer ${settings.token}`, "Content-Type": "application/json"},
@@ -95,13 +96,14 @@ async function translateSelection(text, tabId) {
     });
     const body = await response.json();
     if (!response.ok || !body.expression || generation !== selectionGeneration) return;
-    postedSelection = source;
     await chrome.storage.local.set({
       lastTitle: body.expression.title,
       lastMessage: body.expression.message
     });
   } catch {
     return;
+  } finally {
+    if (inflightSelection === source) inflightSelection = "";
   }
 }
 
